@@ -46,14 +46,17 @@ example, point GitHub Pages at it, or run `npm start` and open http://localhost:
 | Input | Action |
 | --- | --- |
 | `W` `A` `S` `D` | Move (relative to the camera) |
-| Mouse | Camera. Click the game to capture the mouse. |
-| Left click (`J`) | Light attack. Chain up to 4: jab → cross → hook → uppercut. |
-| Right click (`K`) | Heavy attack / combo finisher |
+| Mouse | Camera. Click the game to capture the mouse. Mouse buttons don't attack. |
+| `J` | Light attack. Chain up to 4: jab → cross → hook → uppercut. |
+| `K` | Heavy attack / combo finisher |
 | `Space` | Block. Tap it just before a hit for a **perfect block**. |
 | `Shift` | Dodge. Hold it to sprint. |
 | `Q` | Toggle lock-on (on by default) |
-| `E` (`L`) | Special attack: **Underground Breaker** |
+| `E` (or `L`) | Special attack: **Underground Breaker** |
 | `Esc` | Pause |
+
+All fighting is on the keyboard. Menus work with the mouse, or with the arrow keys, Enter and
+`Esc`.
 
 ### Combat guide
 

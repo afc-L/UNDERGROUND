@@ -162,7 +162,7 @@ b { color: #fff; }
   cursor: pointer; transition: all 0.12s; position: relative; text-align: left;
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
 }
-.btn:hover:not(:disabled), .btn:focus-visible { background: var(--pink); color: #fff; border-color: var(--pink); padding-left: 30px; outline: none; }
+.btn:hover:not(:disabled), .btn:focus { background: var(--pink); color: #fff; border-color: var(--pink); padding-left: 30px; outline: none; }
 .btn.primary { border-color: var(--pink); color: #fff; background: rgba(255, 42, 109, 0.25); }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn.back { font-size: 16px; padding: 8px 16px; }
@@ -180,7 +180,7 @@ b { color: #fff; }
 .menu-buttons { display: flex; flex-direction: column; gap: 8px; width: 290px; }
 .menu-footer { margin-top: 22px; font-size: 13px; letter-spacing: 2px; color: var(--dim); display: flex; gap: 18px; flex-wrap: wrap; }
 .menu-footer span b { color: var(--gold); font-family: var(--display); font-size: 18px; font-weight: normal; letter-spacing: 1px; }
-.menu-controls { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--dim); letter-spacing: 1px; }
+.menu-controls { position: absolute; bottom: 14px; padding: 0 16px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--dim); letter-spacing: 1px; }
 
 .panel-screen { background: linear-gradient(180deg, rgba(5, 4, 7, 0.82), rgba(5, 4, 7, 0.6) 40%, rgba(5, 4, 7, 0.85)); overflow-y: auto; }
 .side-panel { background: linear-gradient(90deg, rgba(5, 4, 7, 0.92) 0%, rgba(5, 4, 7, 0.85) 42%, transparent 62%); }
@@ -193,7 +193,7 @@ b { color: #fff; }
 /* Opponent cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; padding: 16px 34px 34px; }
 .card { background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; cursor: pointer; position: relative; transition: transform 0.12s, border-color 0.12s; border-top: 3px solid var(--accent, #fff); }
-.card:hover:not(.locked) { transform: translateY(-3px); border-color: var(--accent, #fff); box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent); }
+.card:hover:not(.locked), .card:focus:not(.locked) { transform: translateY(-3px); border-color: var(--accent, #fff); box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent); }
 .card .c-title { font-family: var(--display); font-size: 28px; letter-spacing: 2px; color: var(--accent, #fff); }
 .card .c-name { font-size: 13px; color: #ddd; margin-bottom: 6px; }
 .card .c-style { font-size: 12px; letter-spacing: 1px; color: var(--dim); margin-bottom: 8px; font-style: italic; }
@@ -248,6 +248,9 @@ b { color: #fff; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
 .swatch { width: 28px; height: 28px; border: 2px solid transparent; cursor: pointer; transform: skewX(-10deg); }
 .swatch.sel { border-color: #fff; box-shadow: 0 0 8px #fff; }
+.swatch:focus, .chip:focus, .card:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.card.locked:focus { opacity: 0.8; }
+.set-row input:focus, .set-row select:focus, .field input:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .chip { font-family: var(--display); letter-spacing: 2px; font-size: 15px; padding: 4px 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.5); cursor: pointer; color: #ccc; }
 .chip.sel { border-color: var(--pink); color: #fff; background: rgba(255, 42, 109, 0.3); }
 .opt-row input[type='range'] { width: 220px; accent-color: var(--pink); }

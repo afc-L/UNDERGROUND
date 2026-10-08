@@ -144,6 +144,7 @@ export class Game {
   /** mode: 'fight' | 'tournament' | 'training' */
   startFight(profile, mode = 'fight', tournament = null) {
     this.timers = [];
+    this.input.endFrame(); // drop presses left over from the menus
     this.refreshPlayerStats();
     const p = this.player;
     const o = this._makeOpponent(profile);
@@ -330,8 +331,8 @@ export class Game {
     I.dodge = inp.hit('ShiftLeft') || inp.hit('ShiftRight');
     I.sprint = shift && !I.dodge;
     I.block = inp.down('Space');
-    I.light = inp.clickL || inp.hit('KeyJ');
-    I.heavy = inp.clickR || inp.hit('KeyK');
+    I.light = inp.hit('KeyJ');
+    I.heavy = inp.hit('KeyK');
     I.special = inp.hit('KeyE') || inp.hit('KeyL');
     if (inp.hit('KeyQ')) {
       this.lockPref = !this.lockPref;
@@ -349,7 +350,7 @@ export class Game {
     this.rig.mouse(inp.mouseDX, inp.mouseDY, this.lockPref);
 
     if (this.state === 'intro') {
-      if (inp.hit('Space') || inp.hit('Enter') || inp.clickL) this.skipIntro();
+      if (inp.hit('Space') || inp.hit('Enter') || inp.hit('KeyJ')) this.skipIntro();
       p.update(dt, this.noIntent, o, this.events);
       o.update(dt, this.noIntent, p, this.events);
       this.events.length = 0;

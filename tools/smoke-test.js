@@ -95,7 +95,7 @@ const faceOff = (dist = 1.1) => ev((dist) => {
   o.facing = Math.PI;
   g.effects.clearTime();
 }, dist);
-const clickCanvas = (button = 'left') => page.mouse.click(640, 400, { button });
+const press = (key) => page.keyboard.press(key);
 
 // ------------------------------------------------------------------------------------------
 console.log('— Menu');
@@ -108,9 +108,17 @@ await ev(() => {
   window.__underground.frozen = true;
 });
 
+console.log('— Keyboard menu navigation');
+check(await ev(() => document.activeElement && document.activeElement.dataset.action) === 'fight', 'FIGHT is focused when the menu opens');
+await press('ArrowDown');
+check(await ev(() => document.activeElement.dataset.action) === 'tournament', 'Down arrow moves to TOURNAMENT');
+await press('ArrowUp');
+check(await ev(() => document.activeElement.dataset.action) === 'fight', 'Up arrow moves back to FIGHT');
+
 console.log('— Opponent select');
-await page.click('#screen-menu [data-action="fight"]');
-check(await page.isVisible('#screen-select.active'), 'opponent select opens');
+await press('Enter');
+check(await page.isVisible('#screen-select.active'), 'Enter on FIGHT opens opponent select');
+check(await ev(() => document.activeElement.classList.contains('card')), 'first unlocked opponent card is focused');
 const cards = await page.$$('#select-cards .card');
 check(cards.length >= 5, `${cards.length} opponents listed`);
 const locked = await page.$$('#select-cards .card.locked');
@@ -123,7 +131,8 @@ check(await ev(() => !!window.__underground.game.opp), 'hovering a card previews
 await shot('02-select');
 
 console.log('— Fight intro');
-await cards[0].click();
+await cards[0].focus();
+await press('Enter');
 await step(30);
 check(await ev(() => window.__underground.game.state) === 'intro', 'fight starts with an intro');
 check(await page.isVisible('#vs:not(.hidden)'), 'VS splash visible');
@@ -135,6 +144,13 @@ check(s.state === 'fight', 'Space skips the intro into the fight');
 check(await page.isVisible('#hud:not(.hidden)'), 'HUD visible');
 for (const id of ['hud-p-hp', 'hud-p-st', 'hud-p-sp', 'hud-o-hp', 'hud-o-st', 'hud-timer', 'combo']) check(!!(await page.$(`#${id}`)), `HUD has #${id}`);
 await recordEvents();
+
+console.log('— No mouse buttons');
+await faceOff(1.1);
+await page.mouse.click(640, 400, { button: 'left' });
+await page.mouse.click(640, 400, { button: 'right' });
+await step(3);
+check((await st()).p.state !== 'attack', 'mouse clicks do not attack (keyboard-only)');
 
 console.log('— Movement');
 await faceOff(4);
@@ -168,10 +184,10 @@ console.log('— Attacks & combos');
 await faceOff(1.1);
 await recordEvents();
 s = await st();
-await clickCanvas('left');
+await press('KeyJ');
 await step(3);
 s2 = await st();
-check(s2.p.state === 'attack' && s2.p.atk === 'jab', 'left click throws a jab');
+check(s2.p.state === 'attack' && s2.p.atk === 'jab', 'J throws a jab');
 check(s2.p.st < s.p.st, 'attacking costs stamina');
 await step(25);
 s2 = await st();
@@ -180,13 +196,13 @@ check(s2.o.hp < s.o.hp, `jab lands (${(s.o.hp - s2.o.hp).toFixed(1)} dmg)`);
 await faceOff(1.1);
 await recordEvents();
 for (let i = 0; i < 4; i++) {
-  await clickCanvas('left');
+  await press('KeyJ');
   await step(11);
 }
 await step(30);
 let evs = await events();
 const chain = evs.filter((e) => e.type === 'attackStart' && e.who === 'player').map((e) => e.attack);
-check(chain.join(',') === 'jab,cross,hook,uppercut', `4 light clicks chain jab→cross→hook→uppercut (${chain.join(',')})`);
+check(chain.join(',') === 'jab,cross,hook,uppercut', `4 J presses chain jab→cross→hook→uppercut (${chain.join(',')})`);
 const hits = evs.filter((e) => e.type === 'hit' && e.who === 'player').length;
 check(hits >= 3, `combo lands ${hits} hits`);
 check(await ev(() => window.__underground.game.player.stat.maxCombo) >= 3, 'combo counter reaches 3+');
@@ -194,15 +210,15 @@ await shot('05-combo');
 
 await faceOff(1.1);
 await recordEvents();
-await clickCanvas('right');
+await press('KeyK');
 await step(4);
-check((await st()).p.atk === 'haymaker', 'right click throws a heavy haymaker');
+check((await st()).p.atk === 'haymaker', 'K throws a heavy haymaker');
 await step(60);
 await faceOff(1.3);
 await recordEvents();
-await clickCanvas('left');
+await press('KeyJ');
 await step(10);
-await clickCanvas('right');
+await press('KeyK');
 await step(50);
 evs = await events();
 check(evs.some((e) => e.type === 'attackStart' && e.attack === 'roundhouse'), 'light → heavy chains into a roundhouse kick');
@@ -254,7 +270,7 @@ await ev(() => {
   g.player.pos.set(g.opp.pos.x, 0, g.opp.pos.z - 1.1);
   g.player.facing = 0;
 });
-await clickCanvas('right');
+await press('KeyK');
 await step(40);
 evs = await events();
 check(evs.some((e) => e.type === 'hit' && e.who === 'player' && e.counter === 'COUNTER'), 'attacking in the window lands a COUNTER');
@@ -307,7 +323,7 @@ const cash0 = await ev(() => window.__underground.prog.data.cash);
 await ev(() => {
   window.__underground.game.opp.health = 3;
 });
-await clickCanvas('right');
+await press('KeyK');
 await step(40);
 s = await st();
 check(s.state === 'ko', 'reducing health to zero is a KNOCKOUT');
@@ -328,15 +344,21 @@ check(await ev(() => window.__underground.prog.isUnlocked(window.__underground.O
 await shot('10-results');
 
 console.log('— Upgrades');
-await page.click('#r-actions button:has-text("UPGRADES")');
+check(await ev(() => document.activeElement && document.activeElement.textContent) === 'NEXT OPPONENT', 'results focus the main action');
+await press('ArrowRight');
+await press('ArrowRight');
+check(await ev(() => document.activeElement.textContent) === 'UPGRADES', 'arrow keys move between result buttons');
+await press('Enter');
 check(await page.isVisible('#screen-upgrades.active'), 'upgrades screen opens from results');
 const before = await ev(() => ({ cash: window.__underground.prog.data.cash, hp: window.__underground.game.player.stats.maxHealth }));
-await page.click('#upgrade-list .up-row:first-child button');
+await ev(() => document.querySelector('#upgrade-list .up-row:first-child button').focus());
+await press('Enter');
 const after = await ev(() => ({ cash: window.__underground.prog.data.cash, lvl: window.__underground.prog.data.upgrades.health, hp: window.__underground.game.player.stats.maxHealth }));
 check(after.lvl === 1 && after.cash < before.cash, `buying CONDITIONING costs cash ($${before.cash} → $${after.cash})`);
 check(after.hp > before.hp, `upgrade raises max health (${before.hp} → ${after.hp})`);
 await shot('11-upgrades');
-await page.click('#screen-upgrades [data-action="back"]');
+await press('Escape');
+check(await page.isVisible('#screen-menu.active'), 'Esc goes back to the menu');
 
 console.log('— Defeat');
 await page.click('#screen-menu [data-action="fight"]');
@@ -389,7 +411,7 @@ await ev(() => {
   window.__underground.game.opp.health = 2;
 });
 await faceOff(1.1);
-await clickCanvas('right');
+await press('KeyK');
 await step(60);
 check(await ev(() => window.__underground.game.state) !== 'ko', 'training partner cannot be knocked out');
 await shot('12-training');
@@ -410,7 +432,7 @@ await faceOff(1.1);
 await ev(() => {
   window.__underground.game.opp.health = 2;
 });
-await clickCanvas('left');
+await press('KeyJ');
 await step(30);
 await step(300, 1 / 30);
 check(await page.isVisible('#r-actions button:has-text("NEXT FIGHT")'), 'winning offers the NEXT FIGHT');

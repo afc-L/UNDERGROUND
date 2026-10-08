@@ -55,6 +55,15 @@ export class UI {
       this._click();
       this.h.onBack();
     }));
+    // Keyboard navigation for every menu screen: arrows move focus, Enter/Space activate.
+    window.addEventListener('keydown', (e) => this._navKey(e));
+    document.addEventListener('focusin', (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest('.screen.active') && this._lastFocus !== t) {
+        this._lastFocus = t;
+        this.audio.play('uiHover', { reverb: 0 });
+      }
+    });
     document.addEventListener('mouseover', (e) => {
       if (e.target.closest && e.target.closest('.btn:not(:disabled), .card:not(.locked)')) {
         if (this._lastHover !== e.target) this.audio.play('uiHover', { reverb: 0 });
@@ -78,11 +87,106 @@ export class UI {
   show(name) {
     document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
     this.current = name;
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     if (!name) return;
     const el = $(`screen-${name}`);
     if (el) el.classList.add('active');
     const r = { menu: 'renderMenu', select: 'renderSelect', tournament: 'renderTournament', upgrades: 'renderUpgrades', fighter: 'renderFighter', settings: 'renderSettings' }[name];
     if (r) this[r]();
+    this._focusFirst();
+  }
+
+  _focusables() {
+    const screen = document.querySelector('.screen.active');
+    if (!screen) return [];
+    return [...screen.querySelectorAll('button:not(:disabled), input, select, [tabindex="0"]')].filter((el) => el.offsetParent !== null);
+  }
+
+  _focusFirst() {
+    const list = this._focusables();
+    if (!list.length) return;
+    // prefer the main action of the screen over its BACK button
+    const first = list.find((el) => el.matches('.primary, .card:not(.locked)')) || list.find((el) => !el.matches('.back')) || list[0];
+    first.focus({ focusVisible: true });
+  }
+
+  /** Make a non-button element keyboard-activatable. */
+  _activatable(el) {
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter' || e.code === 'Space' || e.code === 'NumpadEnter') {
+        e.preventDefault();
+        e.stopPropagation();
+        el.click();
+      }
+    });
+  }
+
+  _navKey(e) {
+    if (!document.querySelector('.screen.active')) return;
+    const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
+    const cur = document.activeElement;
+    const typing = cur && cur.tagName === 'INPUT' && cur.type === 'text';
+    if (typing && !['ArrowUp', 'ArrowDown', 'Enter', 'NumpadEnter'].includes(e.code)) return;
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && cur && cur.matches && cur.matches('input[type="checkbox"]')) {
+      e.preventDefault();
+      cur.click();
+      return;
+    }
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && typing) {
+      e.preventDefault();
+      this._move(0, 1);
+      return;
+    }
+    const d = dirs[e.code];
+    if (!d) return;
+    // sliders and dropdowns use left/right to change their value
+    if (cur && cur.matches && d[0] !== 0) {
+      if (cur.matches('input[type="range"]')) return;
+      if (cur.matches('select')) {
+        e.preventDefault();
+        const n = cur.options.length;
+        cur.selectedIndex = (cur.selectedIndex + d[0] + n) % n;
+        cur.dispatchEvent(new Event('change'));
+        return;
+      }
+    }
+    e.preventDefault();
+    this._move(d[0], d[1]);
+  }
+
+  _move(dx, dy) {
+    const list = this._focusables();
+    if (!list.length) return;
+    const cur = document.activeElement;
+    if (!list.includes(cur)) {
+      this._focusFirst();
+      return;
+    }
+    const r = cur.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let best = null;
+    let bestScore = Infinity;
+    for (const el of list) {
+      if (el === cur) continue;
+      const q = el.getBoundingClientRect();
+      const x = q.left + q.width / 2 - cx;
+      const y = q.top + q.height / 2 - cy;
+      const along = dx ? x * dx : y * dy;
+      const across = dx ? Math.abs(y) : Math.abs(x);
+      if (along <= 4) continue;
+      const score = along + across * 2.5;
+      if (score < bestScore) {
+        bestScore = score;
+        best = el;
+      }
+    }
+    if (best) {
+      best.focus({ focusVisible: true });
+      best.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   _wallet() {
@@ -129,6 +233,8 @@ export class UI {
         ${d.wins[o.id] ? `<div class="c-beaten">BEATEN ×${d.wins[o.id]}</div>` : ''}
         ${unlocked ? '' : `<div class="c-lock">LOCKED<small>${this.prog.lockReason(o)}</small></div>`}`;
       card.addEventListener('mouseenter', () => this.h.onPreview(o));
+      card.addEventListener('focus', () => this.h.onPreview(o));
+      this._activatable(card);
       card.addEventListener('click', () => {
         if (!unlocked) return;
         this._click();
@@ -181,6 +287,11 @@ export class UI {
         if (this.h.onBuy(u.id)) {
           this.audio.play('purchase');
           this.renderUpgrades();
+          const rows = $('upgrade-list').querySelectorAll('.up-row');
+          const i = UPGRADES.indexOf(u);
+          const b = rows[i] && rows[i].querySelector('button');
+          if (b && !b.disabled) b.focus({ focusVisible: true });
+          else this._focusFirst();
         }
       });
       list.appendChild(row);
@@ -213,6 +324,7 @@ export class UI {
       <div class="opt-row"><div class="lbl">BUILD</div>
         HEIGHT <input type="range" min="0.93" max="1.08" step="0.01" value="${L.build.height}" data-b="height" />
         BULK <input type="range" min="0.86" max="1.2" step="0.01" value="${L.build.bulk}" data-b="bulk" /></div>`;
+    opts.querySelectorAll('[data-k]').forEach((el) => this._activatable(el));
     opts.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('click', () => {
       L[el.dataset.k] = el.dataset.v;
       if (el.dataset.k === 'accessory') L.accessoryColor = el.dataset.v === 'chain' ? '#f5c518' : '#ffffff';
@@ -220,6 +332,8 @@ export class UI {
       this.prog.save();
       this.h.onLookChange();
       this.renderFighter();
+      const again = opts.querySelector(`[data-k="${el.dataset.k}"][data-v="${el.dataset.v}"]`);
+      if (again) again.focus({ focusVisible: true });
     }));
     opts.querySelectorAll('[data-b]').forEach((el) => el.addEventListener('change', () => {
       L.build[el.dataset.b] = parseFloat(el.value);
