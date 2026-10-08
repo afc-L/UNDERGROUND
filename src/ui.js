@@ -3,6 +3,8 @@
 import { OPPONENTS, DIFFICULTY, FIGHT, FIGHTER } from './config.js';
 import { UPGRADES, MAX_UPGRADE, upgradeCost, playerStats } from './upgrades.js';
 import { xpForLevel } from './progression.js';
+import { ATTACKS } from './attacks.js';
+import { STYLES, STYLE_ORDER, styleOf } from './styles.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -223,7 +225,7 @@ export class UI {
         <div class="c-diff ${o.difficulty}">${DIFFICULTY[o.difficulty].label}</div>
         <div class="c-title">${o.title}</div>
         <div class="c-name">${esc(o.name)}</div>
-        <div class="c-style">${o.style}</div>
+        <div class="c-style"><b class="c-fs">${styleOf(o.fightStyle).name}</b> · ${o.style}</div>
         ${bar('HEALTH', o.stats.health / 170)}
         ${bar('POWER', (o.stats.power - 0.5) / 0.95)}
         ${bar('SPEED', (o.stats.speed - 0.5) / 0.8)}
@@ -312,7 +314,10 @@ export class UI {
     const opts = $('f-options');
     const swatchRow = (label, key) => `<div class="opt-row"><div class="lbl">${label}</div><div class="swatches">${LOOK_OPTIONS[key].map((c) => `<div class="swatch ${L[key] === c ? 'sel' : ''}" data-k="${key}" data-v="${c}" style="background:${c}"></div>`).join('')}</div></div>`;
     const chipRow = (label, key) => `<div class="opt-row"><div class="lbl">${label}</div><div class="swatches">${LOOK_OPTIONS[key].map((c) => `<div class="chip ${L[key] === c ? 'sel' : ''}" data-k="${key}" data-v="${c}">${c.toUpperCase()}</div>`).join('')}</div></div>`;
+    const st = styleOf(d.style);
     opts.innerHTML = `
+      <div class="opt-row"><div class="lbl">FIGHTING STYLE</div><div class="swatches">${STYLE_ORDER.map((id) => `<div class="chip ${st.id === id ? 'sel' : ''}" data-style="${id}">${STYLES[id].name}</div>`).join('')}</div>
+        <div class="style-info"><div><span>SPECIAL [E]</span><b>${ATTACKS[st.special].name}</b></div><div><span>STYLE MOVE [L]</span><b>${ATTACKS[st.move].name}</b></div><p>${st.blurb}</p></div></div>
       ${swatchRow('SKIN', 'skin')}
       ${chipRow('HAIR', 'hair')}
       ${swatchRow('HAIR COLOR', 'hairColor')}
@@ -324,7 +329,16 @@ export class UI {
       <div class="opt-row"><div class="lbl">BUILD</div>
         HEIGHT <input type="range" min="0.93" max="1.08" step="0.01" value="${L.build.height}" data-b="height" />
         BULK <input type="range" min="0.86" max="1.2" step="0.01" value="${L.build.bulk}" data-b="bulk" /></div>`;
-    opts.querySelectorAll('[data-k]').forEach((el) => this._activatable(el));
+    opts.querySelectorAll('[data-k], [data-style]').forEach((el) => this._activatable(el));
+    opts.querySelectorAll('[data-style]').forEach((el) => el.addEventListener('click', () => {
+      d.style = el.dataset.style;
+      this._click();
+      this.prog.save();
+      this.h.onStyleChange();
+      this.renderFighter();
+      const again = opts.querySelector(`[data-style="${el.dataset.style}"]`);
+      if (again) again.focus({ focusVisible: true });
+    }));
     opts.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('click', () => {
       L[el.dataset.k] = el.dataset.v;
       if (el.dataset.k === 'accessory') L.accessoryColor = el.dataset.v === 'chain' ? '#f5c518' : '#ffffff';
@@ -349,7 +363,7 @@ export class UI {
       <div><span>CASH</span><span>$${d.cash}</span></div><div><span>REPUTATION</span><span>${d.rep}</span></div>
       <div><span>MAX HEALTH</span><span>${s.maxHealth}</span></div><div><span>MAX STAMINA</span><span>${s.maxStamina}</span></div>
       <div><span>POWER</span><span>${Math.round(s.power * 100)}%</span></div><div><span>SPEED</span><span>${Math.round(s.speed * 100)}%</span></div>
-      <div><span>TITLES</span><span>${d.tournamentWins}</span></div><div><span>STATUS</span><span>${d.champion ? 'CHAMPION' : d.record.w ? 'CONTENDER' : 'UNKNOWN'}</span></div>`;
+      <div><span>STYLE</span><span>${styleOf(d.style).name}</span></div><div><span>TITLES</span><span>${d.tournamentWins}</span></div><div><span>STATUS</span><span>${d.champion ? 'CHAMPION' : d.record.w ? 'CONTENDER' : 'UNKNOWN'}</span></div>`;
   }
 
   renderSettings() {

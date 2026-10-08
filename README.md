@@ -53,11 +53,29 @@ example, point GitHub Pages at it, or run `npm start` and open http://localhost:
 | `Space` | Block. Tap it just before a hit for a **perfect block**. |
 | `Shift` | Dodge. Hold it to sprint. |
 | `Q` | Toggle lock-on (on by default) |
-| `E` (or `L`) | Special attack: **Underground Breaker** |
+| `L` | **Style move**: a heavy move from your fighting style. It can end a combo, but can't start or continue one. |
+| `E` | **Special**: your style's finisher (full meter). Specials must be dodged: blocking one breaks your guard. |
 | `Esc` | Pause |
 
 All fighting is on the keyboard. Menus work with the mouse, or with the arrow keys, Enter and
 `Esc`.
+
+### Fighting styles
+
+Pick a style in **FIGHTER**. It decides your special (`E`) and your style move (`L`). Everyone shares the
+same jab / cross / hook / uppercut / kick toolkit.
+
+| Style | Special (`E`) | Style move (`L`) |
+| --- | --- | --- |
+| Boxing | Knockout Uppercut | Liver Shot: body hook that drains 35 stamina |
+| Muay Thai | Flying Knee | Slashing Elbow: opens a cut that keeps bleeding |
+| Kickboxing | Tornado Kick: jumping spin kick | Head Kick: the longest-reaching strike |
+| Wrestling | Suplex: grab, lift overhead, slam behind you | Double-Leg Takedown: puts them on the mat (doesn't count toward knockdown wear) |
+| Street Brawling | Bull Rush: charging shoulder | Headbutt: always staggers |
+
+Every special is armored, plays a slow-motion cinematic and always knocks down. **Specials can't be
+blocked**: blocking one is a guard break that empties your stamina, stuns you and lets some damage
+through, so dodge it with `Shift` instead. A blocked takedown gets stuffed and leaves the wrestler open.
 
 ### Combat guide
 
@@ -81,8 +99,7 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
   knockdown, stacking up to three. You can see it in how they move: their guard drops and they
   bounce slower. The HUD marks show how many times each fighter has been dropped.
 * **Special meter.** It fills from landed hits, counters, perfect blocks and perfect dodges.
-  Once it's full, `E` fires a slow-motion, armored, cinematic finisher that always knocks
-  down. It then needs a long recharge.
+  Once it's full, `E` fires your style's special. It then needs a long recharge.
 * **Health.** Death matches last: every fighter, including you, has 1.8× the base health
   (you start with 180).
 * **Fight clock.** Each fight has 5:00 on the clock. There are no judges: when time runs out
@@ -100,7 +117,7 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
   refills your special meter.
 * **UPGRADES.** Spend cash on Conditioning (health), Cardio (stamina), Power, Footwork (speed),
   Recovery and Killer Instinct (special meter). Each has 5 levels.
-* **FIGHTER.** Set your name, skin, hair, clothing, gloves, accessories and build, and see your
+* **FIGHTER.** Set your name, fighting style, skin, hair, clothing, gloves, accessories and build, and see your
   record, level and stats.
 * **SETTINGS.** Volume (master/music/effects), mouse sensitivity, invert Y, camera shake
   strength, blood on/off, damage numbers, graphics quality and a career reset.
@@ -109,14 +126,16 @@ Progress is saved to `localStorage` in your browser.
 
 ## The opponents
 
-| Opponent | Style | AI |
-| --- | --- | --- |
-| THE ROOKIE | Balanced | Easy: aggressive but predictable |
-| THE BRAWLER | Slow but powerful | Easy, with heavy hands |
-| THE TECHNICIAN | Fast and defensive, blocks and counters | Normal |
-| THE GHOST | Evasive counter-striker | Normal, with lots of dodging |
-| THE BEAST | Relentless aggression | Hard |
-| THE CHAMPION | Complete fighter that adapts to you | Hard |
+| Opponent | Fighting style | Character | AI |
+| --- | --- | --- | --- |
+| THE ROOKIE | Boxing | Balanced | Easy: aggressive but predictable |
+| THE BRAWLER | Street Brawling | Slow but powerful | Easy, with heavy hands |
+| THE TECHNICIAN | Kickboxing | Fast and defensive, blocks and counters | Normal |
+| THE GHOST | Muay Thai | Evasive counter-striker | Normal, with lots of dodging |
+| THE BEAST | Wrestling | Relentless aggression: takedowns, then the boots | Hard |
+| THE CHAMPION | Muay Thai | Complete fighter that adapts to you | Hard |
+
+Opponents use their style moves to end combos, and they dodge your specials rather than block them.
 
 The AI runs a state machine with the states IDLE, APPROACH, ATTACK, COMBO, DEFEND, DODGE,
 RETREAT, COUNTER and RECOVER. Its reaction time, block/dodge/counter chances, combo length and
@@ -149,7 +168,8 @@ src/
   fighter.js          fighter simulation: state machine, movement, stamina, meter, animation choice
   fighterModel.js     procedural low-poly rig (head, torso, arms, legs, gloves, clothing, hair…)
   poses.js            pose data and blending (flat Float32Arrays, no per-frame allocation)
-  attacks.js          move list: timings, damage, reach, combo tree, key poses
+  attacks.js          move list: timings, damage, reach, combo tree, key poses, specials, style moves
+  styles.js           fighting styles (which special and style move each one gets)
   combat.js           hit detection, blocks, perfect blocks/dodges, counters, balance, KD/KO
   ai.js               AI controller (states, difficulty, personality, player reading)
   input.js            keyboard + mouse (pointer lock)

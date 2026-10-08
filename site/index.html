@@ -122,6 +122,13 @@
   .tree li.counter { border-left-color: var(--gold); }
   .tree li.special { border-left-color: var(--neon); }
 
+  .styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .styles article { background: var(--slab); border-top: 3px solid var(--neon); padding: 16px 16px 14px; }
+  .styles h3 { font-size: 30px; margin-bottom: 10px; }
+  .styles .mv { display: flex; gap: 10px; align-items: baseline; font-family: var(--mono); font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .styles .mv span { color: var(--neon); font-weight: 700; min-width: 14px; }
+  .styles p { margin: 10px 0 0; color: var(--dim); font-size: 14px; }
+
   /* ---------- career strip ---------- */
   .career { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .career figure { margin: 0; }
@@ -158,6 +165,7 @@
     <nav aria-label="Sections">
       <a href="#card">Fight card</a>
       <a href="#fight">How it hits</a>
+      <a href="#styles">Styles</a>
       <a href="#controls">Controls</a>
       <a class="play-link" href="play.html">Play ▸</a>
     </nav>
@@ -192,37 +200,37 @@
       <div class="bill">
         <article class="bout" style="--acc: #3d8bff">
           <div class="no">BOUT<b>1</b></div>
-          <div><h3>The Rookie</h3><div class="who">Danny “Fresh” Okafor</div><div class="style">Balanced · first night in the pit</div><span class="diff easy">EASY</span></div>
+          <div><h3>The Rookie</h3><div class="who">Danny “Fresh” Okafor</div><div class="style">Boxing · balanced · first night in the pit</div><span class="diff easy">EASY</span></div>
           <div class="tape"><span>HEALTH</span><div class="track"><i style="width:50%"></i></div><em>153</em><span>POWER</span><div class="track"><i style="width:37%"></i></div><em>0.85</em><span>SPEED</span><div class="track"><i style="width:63%"></i></div><em>1.00</em><span>DEFENSE</span><div class="track"><i style="width:50%"></i></div><em>0.90</em></div>
           <div class="purse"><div class="amt">$220</div><div class="sub">+10 REP · +60 XP</div></div>
         </article>
         <article class="bout" style="--acc: #d9a400">
           <div class="no">BOUT<b>2</b></div>
-          <div><h3>The Brawler</h3><div class="who">Bruno “Anvil” Kask</div><div class="style">Slow but powerful</div><span class="diff easy">EASY</span></div>
+          <div><h3>The Brawler</h3><div class="who">Bruno “Anvil” Kask</div><div class="style">Street brawling · slow but powerful</div><span class="diff easy">EASY</span></div>
           <div class="tape"><span>HEALTH</span><div class="track"><i style="width:74%"></i></div><em>225</em><span>POWER</span><div class="track"><i style="width:89%"></i></div><em>1.35</em><span>SPEED</span><div class="track"><i style="width:35%"></i></div><em>0.78</em><span>DEFENSE</span><div class="track"><i style="width:44%"></i></div><em>0.85</em></div>
           <div class="purse"><div class="amt">$380</div><div class="sub">+18 REP · +90 XP</div></div>
         </article>
         <article class="bout" style="--acc: #14b8a6">
           <div class="no">BOUT<b>3</b></div>
-          <div><h3>The Technician</h3><div class="who">Ilse “Metronome” Varga</div><div class="style">Fast and defensive · counters</div><span class="diff normal">NORMAL</span></div>
+          <div><h3>The Technician</h3><div class="who">Ilse “Metronome” Varga</div><div class="style">Kickboxing · fast and defensive</div><span class="diff normal">NORMAL</span></div>
           <div class="tape"><span>HEALTH</span><div class="track"><i style="width:62%"></i></div><em>189</em><span>POWER</span><div class="track"><i style="width:47%"></i></div><em>0.95</em><span>SPEED</span><div class="track"><i style="width:85%"></i></div><em>1.18</em><span>DEFENSE</span><div class="track"><i style="width:94%"></i></div><em>1.25</em></div>
           <div class="purse"><div class="amt">$560</div><div class="sub">+28 REP · +130 XP</div></div>
         </article>
         <article class="bout" style="--acc: #a78bfa">
           <div class="no">BOUT<b>4</b></div>
-          <div><h3>The Ghost</h3><div class="who">Rui “Static” Holt</div><div class="style">Evasive counter-striker</div><span class="diff normal">NORMAL</span></div>
+          <div><h3>The Ghost</h3><div class="who">Rui “Static” Holt</div><div class="style">Muay Thai · evasive counter-striker</div><span class="diff normal">NORMAL</span></div>
           <div class="tape"><span>HEALTH</span><div class="track"><i style="width:65%"></i></div><em>198</em><span>POWER</span><div class="track"><i style="width:58%"></i></div><em>1.05</em><span>SPEED</span><div class="track"><i style="width:94%"></i></div><em>1.25</em><span>DEFENSE</span><div class="track"><i style="width:63%"></i></div><em>1.00</em></div>
           <div class="purse"><div class="amt">$760</div><div class="sub">+40 REP · +170 XP</div></div>
         </article>
         <article class="bout" style="--acc: #ef4444">
           <div class="no">BOUT<b>5</b></div>
-          <div><h3>The Beast</h3><div class="who">Volkan “Furnace” Dragan</div><div class="style">Relentless aggression</div><span class="diff hard">HARD</span></div>
+          <div><h3>The Beast</h3><div class="who">Volkan “Furnace” Dragan</div><div class="style">Wrestling · takedowns, then the boots</div><span class="diff hard">HARD</span></div>
           <div class="tape"><span>HEALTH</span><div class="track"><i style="width:82%"></i></div><em>252</em><span>POWER</span><div class="track"><i style="width:74%"></i></div><em>1.20</em><span>SPEED</span><div class="track"><i style="width:73%"></i></div><em>1.08</em><span>DEFENSE</span><div class="track"><i style="width:50%"></i></div><em>0.90</em></div>
           <div class="purse"><div class="amt">$1,050</div><div class="sub">+60 REP · +230 XP</div></div>
         </article>
         <article class="bout main" style="--acc: #f5c518">
           <div class="no">BOUT<b>6</b></div>
-          <div><h3>The Champion</h3><div class="who">Aurelio “The Crown” Sandoval</div><div class="style">Complete fighter · adapts to you</div><span class="diff hard">HARD</span></div>
+          <div><h3>The Champion</h3><div class="who">Aurelio “The Crown” Sandoval</div><div class="style">Muay Thai · complete fighter · adapts to you</div><span class="diff hard">HARD</span></div>
           <div class="tape"><span>HEALTH</span><div class="track"><i style="width:94%"></i></div><em>288</em><span>POWER</span><div class="track"><i style="width:79%"></i></div><em>1.25</em><span>SPEED</span><div class="track"><i style="width:81%"></i></div><em>1.15</em><span>DEFENSE</span><div class="track"><i style="width:88%"></i></div><em>1.20</em></div>
           <div class="purse"><div class="amt">$1,600</div><div class="sub">+100 REP · +340 XP</div></div>
         </article>
@@ -242,7 +250,7 @@
       </div>
       <div class="feats">
         <div class="feat">
-          <figure class="shot"><img src="img/special.jpg" alt="The player launches the Underground Breaker special in slow motion, with pink energy around them" loading="lazy" /><figcaption>UNDERGROUND BREAKER</figcaption></figure>
+          <figure class="shot"><img src="img/special.jpg" alt="The player launches the Knockout Uppercut special in slow motion, with pink energy around them" loading="lazy" /><figcaption>KNOCKOUT UPPERCUT</figcaption></figure>
           <div>
             <h3>Impact you can <span>feel</span></h3>
             <p>Every strike has an impact level from 1 to 6. Higher levels add more hit sparks, a longer hit-stop, harder camera shake, heavier sound and a bigger crowd reaction.</p>
@@ -270,6 +278,25 @@
     </div>
   </section>
 
+  <section id="styles">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <div class="eyebrow">Choose how you fight</div>
+          <h2>Fighting styles</h2>
+        </div>
+        <p>Your style decides your special on E and your style move on L. The basics (jab, cross, hook, uppercut, kicks) are the same for everyone.</p>
+      </div>
+      <div class="styles">
+        <article><h3>Boxing</h3><div class="mv"><span>E</span>Knockout Uppercut</div><div class="mv"><span>L</span>Liver Shot</div><p>Body work that drains their stamina.</p></article>
+        <article><h3>Muay Thai</h3><div class="mv"><span>E</span>Flying Knee</div><div class="mv"><span>L</span>Slashing Elbow</div><p>Opens a cut that keeps bleeding.</p></article>
+        <article><h3>Kickboxing</h3><div class="mv"><span>E</span>Tornado Kick</div><div class="mv"><span>L</span>Head Kick</div><p>Hits from further away than anything else.</p></article>
+        <article><h3>Wrestling</h3><div class="mv"><span>E</span>Suplex</div><div class="mv"><span>L</span>Double-Leg Takedown</div><p>Grab, lift, slam. Take them down, then use the boots.</p></article>
+        <article><h3>Street Brawling</h3><div class="mv"><span>E</span>Bull Rush</div><div class="mv"><span>L</span>Headbutt</div><p>Dirty and direct. The headbutt always staggers.</p></article>
+      </div>
+    </div>
+  </section>
+
   <section id="controls">
     <div class="wrap">
       <div class="sec-head">
@@ -288,7 +315,8 @@
           <div class="key-row"><div class="kbd"><kbd>Space</kbd></div><div class="what">Block. Tap it just before a hit to parry.</div></div>
           <div class="key-row"><div class="kbd"><kbd>Shift</kbd></div><div class="what">Dodge. Hold it to sprint.</div></div>
           <div class="key-row"><div class="kbd"><kbd>Q</kbd></div><div class="what">Toggle lock-on</div></div>
-          <div class="key-row"><div class="kbd"><kbd>E</kbd></div><div class="what">Special attack, when the meter is full (L also works)</div></div>
+          <div class="key-row"><div class="kbd"><kbd>L</kbd></div><div class="what">Style move. It can end a combo, but can't start one.</div></div>
+          <div class="key-row"><div class="kbd"><kbd>E</kbd></div><div class="what">Your style's special, when the meter is full</div></div>
           <div class="key-row"><div class="kbd"><kbd>Esc</kbd></div><div class="what">Pause</div></div>
         </div>
         <div class="tree">
@@ -298,7 +326,7 @@
             <li><b>Kicks</b><div class="seq"><span>JAB / CROSS</span><span class="to">+ K →</span><span class="hot">ROUNDHOUSE</span></div><div class="seq"><span>HOOK / UPPERCUT</span><span class="to">+ K →</span><span class="hot">SPINNING HEEL KICK</span></div></li>
             <li><b>On the ground</b><div class="seq"><span>OPPONENT DOWN</span><span class="to">+ J →</span><span class="hot">STOMP</span></div><div class="seq"><span>OPPONENT DOWN</span><span class="to">+ K →</span><span class="hot">GROUND KICK</span></div></li>
             <li class="counter"><b>Counters</b><p>A perfect block or a dodge through an attack opens a short window. Your next strike lands as a COUNTER for 1.5× damage.</p></li>
-            <li class="special"><b>Underground Breaker</b><p>The meter fills from hits, counters, parries and perfect dodges. The special can't be interrupted and always knocks down, then takes a long time to recharge.</p></li>
+            <li class="special"><b>Specials: dodge them</b><p>The meter fills from hits, counters, parries and perfect dodges. A special can't be interrupted and always knocks down. Blocking one breaks your guard, so the only answer is a dodge.</p></li>
           </ol>
         </div>
       </div>
@@ -317,7 +345,7 @@
       <div class="career">
         <figure><div class="shot"><img src="img/results.jpg" alt="Victory screen with fight stats and a breakdown of rewards" loading="lazy" /></div><h3>Purses &amp; stats</h3><p>After every fight you see accuracy, damage, max combo, counters and knockdowns, along with what you earned.</p></figure>
         <figure><div class="shot"><img src="img/select.jpg" alt="Opponent select screen with locked and unlocked fighter cards" loading="lazy" /></div><h3>Six upgrades</h3><p>Conditioning, Cardio, Power, Footwork, Recovery and Killer Instinct, five levels each.</p></figure>
-        <figure><div class="shot"><img src="img/fighter.jpg" alt="Fighter editor with skin, hair, top, shorts and glove options" loading="lazy" /></div><h3>Your fighter</h3><p>Pick a name, look and build. Then survive the six-fight Pit Invitational for the title and the grand prize.</p></figure>
+        <figure><div class="shot"><img src="img/fighter.jpg" alt="Fighter editor with skin, hair, top, shorts and glove options" loading="lazy" /></div><h3>Your fighter</h3><p>Pick a name, look, build and fighting style. Then survive the six-fight Pit Invitational for the title and the grand prize.</p></figure>
       </div>
     </div>
   </section>

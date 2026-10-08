@@ -53,8 +53,8 @@ const st = () => ev(() => {
   const o = g.opp;
   return {
     state: g.state,
-    p: { x: p.pos.x, z: p.pos.z, hp: p.health, st: p.stamina, state: p.state, atk: p.attack && p.attack.id, sp: p.special, combo: p.combo, counter: p.counterTimer },
-    o: o && { x: o.pos.x, z: o.pos.z, hp: o.health, max: o.stats.maxHealth, state: o.state, kd: o.knockdowns },
+    p: { x: p.pos.x, z: p.pos.z, hp: p.health, st: p.stamina, state: p.state, atk: p.attack && p.attack.id, kind: p.attack && p.attack.kind, sp: p.special, combo: p.combo, counter: p.counterTimer },
+    o: o && { x: o.pos.x, z: o.pos.z, hp: o.health, max: o.stats.maxHealth, state: o.state, kd: o.knockdowns, st: o.stamina },
   };
 });
 // Record every combat event type (and attack ids) the game handles.
@@ -65,7 +65,7 @@ const recordEvents = () => ev(() => {
     g.__wrapped = true;
     const h = g._handle.bind(g);
     g._handle = (e) => {
-      window.__ev.push({ type: e.type, attack: e.attack && e.attack.id, who: (e.attacker || e.fighter || e.defender || {}).id, counter: e.counter || null, knockdown: !!e.knockdown, ko: !!e.ko });
+      window.__ev.push({ type: e.type, attack: e.attack && e.attack.id, kind: e.attack && e.attack.kind, who: (e.attacker || e.fighter || e.defender || {}).id, counter: e.counter || null, knockdown: !!e.knockdown, ko: !!e.ko });
       h(e);
     };
   }
@@ -285,12 +285,12 @@ await ev(() => {
 });
 await page.keyboard.press('KeyE');
 await step(2);
-check((await st()).p.atk === 'special', 'E fires the special when the meter is full');
+check((await st()).p.kind === 'special', 'E fires the special when the meter is full');
 await step(20);
 await shot('06-special');
 await step(30);
 evs = await events();
-check(evs.some((e) => e.type === 'hit' && e.attack === 'special'), 'special connects');
+check(evs.some((e) => e.type === 'hit' && e.kind === 'special'), 'special connects');
 s = await st();
 check(s.state === 'knockdown', 'special causes a knockdown');
 check(await ev(() => window.__underground.game.player.special) < 20, 'special consumes the meter');
@@ -345,9 +345,151 @@ await ev(() => {
 await faceOff(1.4);
 await page.keyboard.press('KeyE');
 await step(5);
-check((await st()).p.atk === 'special', 'special can be re-used once the meter refills');
+check((await st()).p.kind === 'special', 'special can be re-used once the meter refills');
 await step(80);
 for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
+
+console.log('— Fighting styles, style moves & specials');
+await faceOff(1.1);
+await recordEvents();
+await press('KeyL');
+await step(3);
+check((await st()).p.atk === 'liverShot', 'L throws the style move (Boxing: LIVER SHOT)');
+await step(40);
+check((await st()).o.st < 70, `liver shot drains their stamina (${Math.round((await st()).o.st)} left)`);
+await faceOff(1.1);
+await recordEvents();
+await press('KeyJ');
+await step(11);
+await press('KeyJ');
+await step(11);
+await press('KeyL');
+await step(40);
+evs = await events();
+let ch = evs.filter((e) => e.type === 'attackStart' && e.who === 'player').map((e) => e.attack);
+check(ch.join(',') === 'jab,cross,liverShot', `style move ends a combo (${ch.join(',')})`);
+check(await ev(() => Object.keys(window.__underground.game.player.styleAtk.next).length === 0), 'nothing chains out of a style move');
+// blocking a special is a guard break
+await faceOff(1.3);
+await recordEvents();
+await page.keyboard.down('Space');
+await step(30);
+await ev(() => {
+  const o = window.__underground.game.opp;
+  o.startAttack(o.specialAtk, []);
+});
+await step(50);
+await page.keyboard.up('Space');
+evs = await events();
+check(evs.some((e) => e.type === 'guardBreak'), 'blocking a special gets your guard broken');
+check((await st()).p.st < 30, 'guard break empties your stamina');
+// every style's special and style move
+const styleRes = await ev(() => {
+  const U = window.__underground;
+  const g = U.game;
+  const out = {};
+  for (const id of ['boxing', 'muaythai', 'kickboxing', 'wrestling', 'brawling']) {
+    const p = g.player;
+    const o = g.opp;
+    p.setStyle(id);
+    const res = {};
+    for (const which of ['styleAtk', 'specialAtk']) {
+      for (const f of [p, o]) {
+        f.setState('idle');
+        f.vel.set(0, 0, 0);
+        f.moveVel.set(0, 0, 0);
+        f.health = f.stats.maxHealth;
+        f.stamina = f.stats.maxStamina;
+        f.invuln = 0;
+        f.balance = 0;
+        f.knockdowns = 0;
+        f.thrower = null;
+      }
+      g.state = 'fight';
+      g.ai.mode = 'idle';
+      g.effects.clearTime();
+      p.pos.set(0, 0, 0);
+      p.facing = 0;
+      o.pos.set(0, 0, 1.2);
+      o.facing = Math.PI;
+      const hp0 = o.health;
+      const types = [];
+      const h = g._handle.bind(g);
+      g._handle = (e) => {
+        types.push(e.type);
+        h(e);
+      };
+      p.special = 100;
+      p.specialCooldown = 0;
+      p.startAttack(p[which], []);
+      for (let i = 0; i < 120; i++) g.update(1 / 60);
+      g._handle = h;
+      res[which] = { id: p[which].id, dmg: Math.round(hp0 - o.health), types: [...new Set(types)].join(' '), oppState: o.state };
+      for (let i = 0; i < 400 && g.state === 'knockdown'; i++) {
+        g.match.getUpAt = 0;
+        g.update(1 / 30);
+      }
+    }
+    out[id] = res;
+  }
+  return out;
+}).catch((e) => ({ error: String(e) }));
+if (styleRes.error) check(false, styleRes.error);
+else {
+  for (const [id, r] of Object.entries(styleRes)) {
+    console.log(`      ${id.padEnd(11)} move ${r.styleAtk.id.padEnd(10)} dmg ${String(r.styleAtk.dmg).padStart(3)} [${r.styleAtk.types}] | special ${r.specialAtk.id.padEnd(16)} dmg ${String(r.specialAtk.dmg).padStart(3)} [${r.specialAtk.types}]`);
+    check(r.styleAtk.dmg > 0, `${id}: style move ${r.styleAtk.id} lands`);
+    check(r.specialAtk.dmg > 15 && /knockdown|down/.test(r.specialAtk.oppState + ' ' + r.specialAtk.types) || /grab/.test(r.specialAtk.types), `${id}: special ${r.specialAtk.id} lands and drops them`);
+  }
+  check(/grab/.test(styleRes.wrestling.specialAtk.types) && styleRes.wrestling.specialAtk.dmg > 15, 'wrestling special is a SUPLEX: grab, then slam for big damage');
+  check(styleRes.wrestling.styleAtk.oppState !== 'idle' && /hit/.test(styleRes.wrestling.styleAtk.types), 'wrestling takedown connects');
+  check(/hit/.test(styleRes.muaythai.styleAtk.types) && styleRes.muaythai.styleAtk.dmg > 12, 'muay thai elbow cuts (bleeds on top of the hit)');
+}
+await ev(() => window.__underground.game.player.setStyle(window.__underground.prog.data.style));
+await ev(() => {
+  const g = window.__underground.game;
+  for (const f of [g.player, g.opp]) {
+    f.setState('idle');
+    f.bleed = 0;
+  }
+  g.state = 'fight';
+});
+// the AI dodges specials instead of blocking them
+const aiDodge = await ev(() => {
+  const U = window.__underground;
+  const g = U.game;
+  const ai = new U.AIController(U.OPPONENTS[3], 'hard');
+  g.ai = ai;
+  let dodged = 0;
+  for (let k = 0; k < 6; k++) {
+    const p = g.player;
+    const o = g.opp;
+    for (const f of [p, o]) {
+      f.setState('idle');
+      f.health = f.stats.maxHealth;
+      f.stamina = f.stats.maxStamina;
+      f.invuln = 0;
+    }
+    g.state = 'fight';
+    p.pos.set(0, 0, 0);
+    p.facing = 0;
+    o.pos.set(0, 0, 2.2);
+    o.facing = Math.PI;
+    p.startAttack(p.specialAtk, []);
+    let saw = false;
+    for (let i = 0; i < 60; i++) {
+      g.update(1 / 60);
+      if (o.state === 'dodge') saw = true;
+    }
+    if (saw) dodged++;
+    for (let i = 0; i < 400 && g.state === 'knockdown'; i++) {
+      g.match.getUpAt = 0;
+      g.update(1 / 30);
+    }
+  }
+  return dodged;
+});
+check(aiDodge >= 2, `the AI dodges incoming specials (${aiDodge}/6)`);
 
 console.log('— Health & ground attacks');
 check(await ev(() => window.__underground.game.player.stats.maxHealth) >= 180, `player health scaled up (${await ev(() => window.__underground.game.player.stats.maxHealth)})`);
@@ -603,6 +745,10 @@ check(await page.isVisible('#screen-fighter.active'), 'fighter screen opens');
 await page.click('#f-options .swatch[data-k="shorts"]:nth-child(2)');
 await step(10);
 check(await ev(() => window.__underground.prog.data.look.shorts) === '#1e40af', 'changing a color updates the fighter');
+await page.click('#f-options [data-style="wrestling"]');
+check(await ev(() => window.__underground.prog.data.style) === 'wrestling', 'fighting style can be changed in the fighter editor');
+check(await ev(() => window.__underground.game.player.specialAtk.id) === 'suplex', 'choosing WRESTLING makes the special a SUPLEX');
+check(/SUPLEX/.test(await page.textContent('#f-options .style-info')) && /TAKEDOWN/.test(await page.textContent('#f-options .style-info')), 'editor shows the style\'s special and style move');
 await page.fill('#f-name', 'Iron Test');
 check(await ev(() => window.__underground.prog.data.name) === 'IRON TEST', 'fighter name saved');
 await shot('13-fighter');
@@ -625,6 +771,7 @@ const soak = await ev(() => {
     const h = g._handle.bind(g);
     g._handle = (e) => {
       counts[e.type] = (counts[e.type] || 0) + 1;
+      if (e.type === 'attackStart' && e.attacker === g.opp && e.attack.style) counts.style = (counts.style || 0) + 1;
       h(e);
     };
     let n = 0;
@@ -635,14 +782,15 @@ const soak = await ev(() => {
     const states = new Set([...g.ai.visited, ...g.autopilot.visited]);
     g._handle = h;
     g.autopilot = null;
-    out.push({ id: prof.id, result: g.match.result ? (g.match.result.won ? 'autopilot' : prof.id) : 'none', how: g.match.result ? (g.match.result.ko ? 'KO' : 'decision') : '-', secs: Math.round(g.match.elapsed), hits: counts.hit || 0, blocks: counts.block || 0, kds: (g.player.knockdowns || 0) + (g.opp.knockdowns || 0), states: [...states].sort().join(' ') });
+    out.push({ id: prof.id, result: g.match.result ? (g.match.result.won ? 'autopilot' : prof.id) : 'none', how: g.match.result ? (g.match.result.ko ? 'KO' : 'decision') : '-', secs: Math.round(g.match.elapsed), hits: counts.hit || 0, blocks: counts.block || 0, style: counts.style || 0, kds: (g.player.knockdowns || 0) + (g.opp.knockdowns || 0), states: [...states].sort().join(' ') });
     g.quitFight();
   }
   return out;
 });
-for (const r of soak) console.log(`      ${r.id.padEnd(11)} winner=${r.result.padEnd(11)} ${r.how.padEnd(8)} ${String(r.secs).padStart(3)}s hits=${r.hits} blocks=${r.blocks} knockdowns=${r.kds} [${r.states}]`);
+for (const r of soak) console.log(`      ${r.id.padEnd(11)} winner=${r.result.padEnd(11)} ${r.how.padEnd(8)} ${String(r.secs).padStart(3)}s hits=${r.hits} blocks=${r.blocks} style=${r.style} knockdowns=${r.kds} [${r.states}]`);
 check(soak.every((r) => r.result !== 'none'), 'every AI fight reaches a conclusion');
 check(soak.every((r) => r.hits > 5), 'AI lands hits in every fight');
+check(soak.filter((r) => r.style > 0).length >= 4, 'AI opponents use their style moves');
 const allStates = new Set(soak.flatMap((r) => r.states.split(' ')));
 for (const sName of ['IDLE', 'APPROACH', 'COMBO', 'DEFEND', 'RETREAT', 'COUNTER', 'RECOVER']) check(allStates.has(sName), `AI uses state ${sName}`);
 await ev(() => window.__underground.handlers.onResultsGo('menu'));

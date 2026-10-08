@@ -8,6 +8,7 @@ function defaults() {
   return {
     name: 'NO NAME',
     look: JSON.parse(JSON.stringify(PLAYER_DEFAULT_LOOK)),
+    style: 'boxing', // fighting style: decides the special and the style move
     cash: 150,
     rep: 0,
     xp: 0,

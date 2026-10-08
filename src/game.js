@@ -71,18 +71,19 @@ export class Game {
   buildPlayer() {
     const d = this.prog.data;
     if (this.player) this.player.model.dispose();
-    this.player = new Fighter({ id: 'player', name: d.name, title: d.name, look: d.look, accent: '#ff2a6d', isPlayer: true, stats: playerStats(d) });
+    this.player = new Fighter({ id: 'player', name: d.name, title: d.name, look: d.look, accent: '#ff2a6d', isPlayer: true, style: d.style, stats: playerStats(d) });
     this.scene.add(this.player.model.root);
   }
 
   refreshPlayerStats() {
     this.player.stats = { ...this.player.stats, ...playerStats(this.prog.data) };
     this.player.name = this.player.title = this.prog.data.name;
+    this.player.setStyle(this.prog.data.style);
   }
 
   _makeOpponent(profile) {
     if (this.opp) this.opp.model.dispose();
-    this.opp = new Fighter({ id: profile.id, name: profile.name, title: profile.title, look: profile.look, accent: profile.accent, stats: opponentStats(profile) });
+    this.opp = new Fighter({ id: profile.id, name: profile.name, title: profile.title, look: profile.look, accent: profile.accent, style: profile.fightStyle, stats: opponentStats(profile) });
     this.scene.add(this.opp.model.root);
     return this.opp;
   }
@@ -332,7 +333,8 @@ export class Game {
     I.block = inp.down('Space');
     I.light = inp.hit('KeyJ');
     I.heavy = inp.hit('KeyK');
-    I.special = inp.hit('KeyE') || inp.hit('KeyL');
+    I.special = inp.hit('KeyE');
+    I.style = inp.hit('KeyL');
     if (inp.hit('KeyQ')) {
       this.lockPref = !this.lockPref;
       this.ui.notify(this.lockPref ? 'LOCK-ON' : 'FREE CAMERA', 'small');
@@ -458,7 +460,8 @@ export class Game {
           const def = ev.attacker === p ? this.opp : p;
           this.rig.cinematic('special', { a: ev.attacker, b: def, side: Math.random() < 0.5 ? 1 : -1 }, 0.85);
           fx.speedLines(0.8);
-          this.ui.notify(ev.attacker === p ? 'UNDERGROUND BREAKER!' : `${ev.attacker.title}: SPECIAL!`, 'special big');
+          this.ui.notify(ev.attacker === p ? `${a.name}!` : `${ev.attacker.title}: ${a.name}!`, 'special big');
+          if (ev.attacker !== p) this.ui.notify('DODGE IT! (SHIFT)', 'small warn', 0.9);
           this.excite = Math.max(this.excite, 0.85);
           au.crowdReact('ooh', 0.8);
         }
@@ -487,12 +490,41 @@ export class Game {
         this.excite += 0.15;
         break;
       }
+      case 'grab':
+        au.play('block', { vol: 1, rate: 0.7 });
+        au.play('whoosh', { vol: 0.6, rate: 0.6 });
+        fx.slowmo(0.45, 0.6);
+        this.rig.addTrauma(0.2);
+        this.ui.notify(ev.attacker === p ? 'SUPLEX!' : `${ev.attacker.title}: SUPLEX!`, 'special big');
+        au.crowdReact('ooh', 1);
+        this.excite += 0.3;
+        break;
+      case 'throwLand':
+        this.combat.slam(ev.attacker, ev.defender, this.events);
+        fx.dustBurst(ev.defender.pos.x, ev.defender.pos.z, 30, 1.3);
+        au.play('bodyfall', { vol: 1.2 });
+        break;
+      case 'bleed': {
+        const f = ev.fighter;
+        if (fx.bloodOn && f.state !== 'ko') {
+          const hy = f.isDown ? 0.3 : f.model.height * 0.86;
+          fx.bloodDrops.emit(f.pos.x + (Math.random() - 0.5) * 0.15, hy, f.pos.z + (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.3, -0.2, (Math.random() - 0.5) * 0.3, 0.5, 0.02, 0.03, 0.9, -9.8, 0.2);
+          if (Math.random() < 0.35) fx.splat(f.pos.x + (Math.random() - 0.5) * 0.4, f.pos.z + (Math.random() - 0.5) * 0.4, 0.06 + Math.random() * 0.08);
+        }
+        break;
+      }
       case 'guardBreak':
         au.play('guardBreak', { vol: 1 });
         fx.impact(ev.point, 3, 0xff8a3d);
         this.rig.addTrauma(0.3);
         fx.hitstop(0.08);
-        this.ui.notify('GUARD BREAK!', ev.defender === p ? 'bad' : 'good');
+        this.ui.notify(ev.special ? 'BLOCKED A SPECIAL: GUARD BROKEN!' : 'GUARD BREAK!', ev.defender === p ? 'bad' : 'good');
+        if (ev.special) {
+          fx.hitstop(0.12);
+          fx.screenFlash(0.3);
+          this.rig.addTrauma(0.3);
+          fx.impact(ev.point, 4, 0xff8a3d);
+        }
         au.crowdReact('ooh', 0.8);
         this.excite += 0.2;
         break;
@@ -565,6 +597,12 @@ export class Game {
       au.play('parry', { vol: 0.35 });
     }
     if (ev.ground && ev.attacker === p && ev.combo === 1) this.ui.notify(a.name, 'small');
+    if (a.style && !ev.ko) this.ui.notify(ev.attacker === p ? `${a.name}!` : `${ev.attacker.title}: ${a.name}`, ev.attacker === p ? 'good' : 'bad');
+    if (ev.liver) this.ui.notify(ev.defender === p ? 'WINDED: STAMINA DRAINED' : 'STAMINA DRAINED', ev.defender === p ? 'bad' : 'good');
+    if (ev.cut && fx.bloodOn) {
+      fx.bloodSpray(ev.point, 5, dir);
+      this.ui.notify(ev.defender === p ? 'YOU\'RE CUT: BLEEDING' : 'CUT OPEN: BLEEDING', ev.defender === p ? 'bad' : 'good');
+    }
     if (ev.stagger) this.ui.notify(ev.defender === p ? 'STAGGERED' : 'THEY\'RE HURT!', ev.defender === p ? 'bad' : 'good');
 
     // crowd
@@ -573,13 +611,13 @@ export class Game {
     if (lvl >= 3 || ev.combo === 5 || ev.combo === 10) au.crowdReact(lvl >= 4 ? 'roar' : 'cheer', 0.3 + lvl * 0.12);
 
     if (ev.ko) this._beginKO(ev.attacker, ev.defender, false);
-    else if (ev.knockdown) this._beginKnockdown(ev.defender, ev.attacker, ev.tko);
+    else if (ev.knockdown) this._beginKnockdown(ev.defender, ev.attacker, ev.tko, ev.takedown);
   }
 
   // -------------------------------------------------------------------------------------------
   // Knockdown sequence
 
-  _beginKnockdown(down, up, tko) {
+  _beginKnockdown(down, up, tko, takedown = false) {
     const m = this.match;
     const fx = this.effects;
     this.state = 'knockdown';
@@ -588,6 +626,7 @@ export class Game {
     m.count = 0;
     m.countTimer = -1.0; // first count after the fall
     m.tko = tko;
+    m.takedown = takedown;
     fx.slowmo(0.25, 1.0);
     fx.screenFlash(0.45);
     fx.speedLines(1);
@@ -598,7 +637,7 @@ export class Game {
     this.audio.play('slowmo', { vol: 0.6 });
     this.audio.crowdReact('roar', 1.1);
     this.excite = 1.15;
-    this.ui.bigText(tko ? 'KNOCKDOWN!' : 'KNOCKDOWN!', 'kd', 1.6);
+    this.ui.bigText(takedown ? 'TAKEDOWN!' : 'KNOCKDOWN!', 'kd', 1.6);
     this.ui.comboBreak();
     this.after(0.55, () => {
       this.audio.play('bodyfall', { vol: 1, reverb: 0.5 });
@@ -652,7 +691,7 @@ export class Game {
         down.stamina = Math.max(down.stamina, down.stats.maxStamina * 0.65);
         down.balance = 0;
         this.audio.crowdReact('cheer', 0.6);
-        if (m.mode !== 'training') {
+        if (m.mode !== 'training' && !m.takedown) {
           const pct = Math.round((1 - down.wearPower) * 100);
           this.ui.notify(down === this.player ? `YOU'RE WEAKENED (-${pct}% POWER)` : `THEY'RE WEAKENED (-${pct}% POWER)`, down === this.player ? 'bad' : 'good', 1.8);
         }

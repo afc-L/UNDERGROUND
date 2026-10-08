@@ -73,6 +73,28 @@ export class Combat {
 
     // ---- Blocking (must be facing the attacker) ----
     const blocking = (def.state === 'block' || def.state === 'blockstun') && angleTo(def, att) < 1.75;
+    if (blocking && atk.kind === 'special') {
+      // Specials can't be blocked: the guard is smashed open and some damage gets through
+      const chip = atk.damage * att.stats.power * 0.3 * FIGHT.damageScale * this.damageMult;
+      def.health = Math.max(1, def.health - chip);
+      def.stamina = 0;
+      def.staminaDelay = 0.8;
+      def.stagger(1.0);
+      def.balance = Math.min(FIGHTER.balanceMax * 0.9, def.balance + 40);
+      def.vel.set(dirX * atk.knockback * 0.6, 0, dirZ * atk.knockback * 0.6);
+      def.model.flash = 0.8;
+      att.stat.landed++;
+      att.stat.damage += chip;
+      events.push({ type: 'guardBreak', attacker: att, defender: def, attack: atk, point, special: true });
+      return;
+    }
+    if (blocking && atk.effect === 'takedown') {
+      // takedown stuffed: the shooter eats a sprawl and is left open
+      att.stagger(0.6);
+      def.stat.blocked++;
+      events.push({ type: 'block', attacker: att, defender: def, attack: atk, point, stuffed: true });
+      return;
+    }
     if (blocking) {
       const sinceBlock = def.clock - def.blockStart;
       if (def.state === 'block' && sinceBlock <= FIGHTER.parryWindow && atk.kind !== 'special') {
@@ -99,6 +121,16 @@ export class Combat {
         def.setState('blockstun', atk.blockstun);
         events.push({ type: 'block', attacker: att, defender: def, attack: atk, point });
       }
+      return;
+    }
+
+    // ---- Throw (suplex): grab now, the damage lands with the slam ----
+    if (atk.throw) {
+      def.grabbedBy(att);
+      att.setState('throwing', 1.15);
+      att.stat.landed++;
+      if (att.attackCounter) att.stat.counters++;
+      events.push({ type: 'grab', attacker: att, defender: def, attack: atk, point });
       return;
     }
 
@@ -158,9 +190,19 @@ export class Combat {
       return;
     }
 
+    if (atk.effect === 'liver') {
+      def.useStamina(35);
+      ev.liver = true;
+    }
+    if (atk.effect === 'cut') {
+      def.bleed = Math.max(def.bleed, 6);
+      ev.cut = true;
+    }
     const heavyish = atk.impact >= 2 || atk.kind !== 'light';
-    if (atk.kind === 'special' || (def.balance >= FIGHTER.balanceMax && heavyish)) {
-      def.knockDown();
+    const takedown = atk.effect === 'takedown';
+    if (atk.kind === 'special' || takedown || (def.balance >= FIGHTER.balanceMax && heavyish)) {
+      def.knockDown(!takedown);
+      ev.takedown = takedown;
       def.facing = Math.atan2(att.pos.x - def.pos.x, att.pos.z - def.pos.z);
       def.vel.set(dirX * (kb + 2), 0, dirZ * (kb + 2));
       att.stat.knockdowns++;
@@ -169,13 +211,43 @@ export class Combat {
       if (def.knockdowns >= FIGHT.maxKnockdowns && !this.trainingInfinite && !FIGHT.deathMatch) ev.tko = true;
       return;
     }
-    if (def.balance >= FIGHTER.balanceMax) {
-      def.balance = FIGHTER.balanceMax * 0.8;
+    if (def.balance >= FIGHTER.balanceMax || atk.effect === 'stagger') {
+      if (def.balance >= FIGHTER.balanceMax) def.balance = FIGHTER.balanceMax * 0.8;
       def.stagger(0.75);
       ev.stagger = true;
     } else {
       def.applyHitstun(atk.hitstun * (counter ? 1.25 : 1), atk.height === 'high', -atk.side);
     }
+    events.push(ev);
+  }
+
+  /** The suplex lands: the thrown fighter is slammed into the mat behind the thrower. */
+  slam(att, def, events) {
+    if (def.state !== 'thrown') return;
+    const atk = att.specialAtk && att.specialAtk.throw ? att.specialAtk : null;
+    const base = atk ? atk.damage : 30;
+    const mult = att.stats.power * att.fatigue * att.wearPower / def.stats.defense;
+    const damage = Math.max(1, base * mult * FIGHT.damageScale * this.damageMult);
+    att.stat.damage += Math.min(damage, def.health);
+    att.addMeter(METER.counter);
+    def.addMeter(METER.takenHit);
+    def.health -= damage;
+    if (this.trainingInfinite && def.health < 1) def.health = 1;
+    def.model.flash = 1;
+    def.facing = att.facing;
+    const point = new THREE.Vector3(def.pos.x, 0.35, def.pos.z);
+    const ev = { type: 'hit', attacker: att, defender: def, attack: atk || { id: 'slam', name: 'SLAM', kind: 'special', sound: 'punchHeavy', impact: 5 }, damage, counter: null, combo: 1, point, impact: 5, slam: true };
+    if (def.health <= 0) {
+      def.health = 0;
+      def.knockOut();
+      def.stateTime = 0.5;
+      ev.ko = true;
+    } else {
+      def.knockDown();
+      def.stateTime = 0.5; // already on the mat
+      ev.knockdown = true;
+    }
+    att.stat.knockdowns++;
     events.push(ev);
   }
 
@@ -227,7 +299,7 @@ export class Combat {
     const d = Math.hypot(dx, dz);
     const min = FIGHTER.radius * 2;
     // no body collision with someone lying on the mat: you can step over (and onto) them
-    const lying = (f) => f.state === 'knockdown' || f.state === 'down' || f.state === 'ko';
+    const lying = (f) => f.state === 'knockdown' || f.state === 'down' || f.state === 'ko' || f.state === 'thrown' || f.state === 'throwing';
     if (d < min && !lying(a) && !lying(b)) {
       const nx = d > 1e-4 ? dx / d : 1;
       const nz = d > 1e-4 ? dz / d : 0;

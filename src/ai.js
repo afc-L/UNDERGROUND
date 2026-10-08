@@ -16,6 +16,11 @@ const PLANS = {
   haymaker: ['heavy'],
   hayHook: ['heavy', 'light', 'light'],
   pokes: ['light'],
+  // style move (L) as a combo finisher or on its own
+  styleSolo: ['style'],
+  jabStyle: ['light', 'style'],
+  twoStyle: ['light', 'light', 'style'],
+  threeStyle: ['light', 'light', 'light', 'style'],
 };
 
 export class AIController {
@@ -56,7 +61,7 @@ export class AIController {
   update(dt, me, opp, events) {
     const I = this.intent;
     I.moveX = I.moveZ = 0;
-    I.light = I.heavy = I.dodge = I.special = I.sprint = false;
+    I.light = I.heavy = I.dodge = I.special = I.style = I.sprint = false;
     I.lock = true;
     this.events = events;
     this.stateTime += dt;
@@ -91,9 +96,9 @@ export class AIController {
       I.block = false;
       return I;
     }
-    if (me.knockdowns !== this.seenKnockdowns && me.canAct) {
+    if (me.downs !== this.seenKnockdowns && me.canAct) {
       // just got back up from a knockdown: cover up and buy time
-      this.seenKnockdowns = me.knockdowns;
+      this.seenKnockdowns = me.downs;
       this.reaction = null;
       this.setState('RECOVER', rand(0.6, 1.2) * (1.2 - d.reaction));
     }
@@ -108,8 +113,8 @@ export class AIController {
     // ---- Opponent on the ground: walk over and stomp / kick them (or let them get up) ----
     if (opp.state === 'knockdown' || opp.state === 'down') {
       I.block = false;
-      if (this.groundKd !== opp.knockdowns) {
-        this.groundKd = opp.knockdowns;
+      if (this.groundKd !== opp.downs) {
+        this.groundKd = opp.downs;
         this.groundMode = chance(0.3 + p.aggression * 0.65 + (d.reads ? 0.1 : 0));
         this.groundKicks = 1 + ((Math.random() * (d.comboLength + 1)) | 0);
         this.groundT = rand(0.25, 0.6);
@@ -152,7 +157,16 @@ export class AIController {
     // ---- Reactive defense against a new incoming attack ----
     if (opp.state === 'attack' && opp.attackSerial !== this.lastSerial) {
       this.lastSerial = opp.attackSerial;
-      if (dist < opp.attack.range + 2.2 && this.state !== 'COMBO') {
+      if (opp.attack.kind === 'special' && dist < opp.attack.range + 5) {
+        // Specials can't be blocked (guard break): dodge it, timed to the moment it lands
+        const dodge = Math.min(0.95, d.dodgeChance + 0.35 + (p.evasive || 0) + (d.reads ? 0.15 : 0));
+        if (me.stamina >= 6 && chance(dodge)) {
+          const lands = (opp.attack.startup - 0.1) / opp.attackRate;
+          this.reaction = { action: 'dodge', at: Math.max(d.reaction * 0.8, lands), counter: chance(d.counterChance + this.mods.counter) };
+        } else if (chance(d.blockChance * 0.4)) {
+          this.reaction = { action: 'block', at: d.reaction, counter: false }; // a mistake: it gets guard broken
+        }
+      } else if (dist < opp.attack.range + 2.2 && this.state !== 'COMBO') {
         const heavy = opp.attack.kind !== 'light';
         let block = (d.blockChance + this.mods.block + (p.defensive || 0)) * (heavy ? 1.1 : 0.85);
         let dodge = d.dodgeChance + (p.evasive || 0) + (heavy ? 0.1 : 0);
@@ -346,6 +360,8 @@ export class AIController {
       if (chance(heavy)) opts.push('haymaker', 'hayHook');
       if (d.comboLength >= 4) opts.push('spinFinisher', 'fourPiece');
     }
+    // style move: everyone uses it, heavier hitters more often
+    if (chance(0.35 + heavy * 0.4)) opts.push(d.comboLength >= 4 ? 'threeStyle' : d.comboLength >= 3 ? 'twoStyle' : 'jabStyle', 'styleSolo');
     if (d.staminaSmart && stam < 0.35) opts = ['pokes', 'jabs'];
     const plan = PLANS[opts[(Math.random() * opts.length) | 0]];
     this._beginPlan(plan.slice(0, Math.max(1, d.comboLength + this.mods.combo)));
@@ -404,6 +420,7 @@ export class AIController {
 
   _press(kind) {
     if (kind === 'light') this.intent.light = true;
+    else if (kind === 'style') this.intent.style = true;
     else this.intent.heavy = true;
   }
 

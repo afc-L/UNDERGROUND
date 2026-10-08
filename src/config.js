@@ -124,6 +124,7 @@ export const PLAYER_DEFAULT_LOOK = {
 export const OPPONENTS = [
   {
     id: 'rookie',
+    fightStyle: 'boxing',
     title: 'THE ROOKIE',
     name: 'Danny "Fresh" Okafor',
     style: 'Balanced',
@@ -142,6 +143,7 @@ export const OPPONENTS = [
   },
   {
     id: 'brawler',
+    fightStyle: 'brawling',
     title: 'THE BRAWLER',
     name: 'Bruno "Anvil" Kask',
     style: 'Slow but powerful',
@@ -160,6 +162,7 @@ export const OPPONENTS = [
   },
   {
     id: 'technician',
+    fightStyle: 'kickboxing',
     title: 'THE TECHNICIAN',
     name: 'Ilse "Metronome" Varga',
     style: 'Fast and defensive',
@@ -178,6 +181,7 @@ export const OPPONENTS = [
   },
   {
     id: 'ghost',
+    fightStyle: 'muaythai',
     title: 'THE GHOST',
     name: 'Rui "Static" Holt',
     style: 'Evasive counter-striker',
@@ -196,6 +200,7 @@ export const OPPONENTS = [
   },
   {
     id: 'beast',
+    fightStyle: 'wrestling',
     title: 'THE BEAST',
     name: 'Volkan "Furnace" Dragan',
     style: 'Relentless aggression',
@@ -214,6 +219,7 @@ export const OPPONENTS = [
   },
   {
     id: 'champion',
+    fightStyle: 'muaythai',
     title: 'THE CHAMPION',
     name: 'Aurelio "The Crown" Sandoval',
     style: 'Complete fighter',
@@ -235,6 +241,7 @@ export const OPPONENTS = [
 // Training partner used in TRAINING mode.
 export const TRAINING_DUMMY = {
   id: 'sparring',
+  fightStyle: 'boxing',
   title: 'SPARRING PARTNER',
   name: 'Gym Regular',
   style: 'Practice',

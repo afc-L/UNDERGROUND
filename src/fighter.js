@@ -4,14 +4,21 @@
 import * as THREE from 'three';
 import { FIGHTER, ARENA, FIGHT } from './config.js';
 import { ATTACKS, chainAttack } from './attacks.js';
+import { styleOf } from './styles.js';
 import { FighterModel } from './fighterModel.js';
 import {
   GUARD, RELAXED, BLOCK, DODGE, HIT_HEAD, HIT_BODY, STAGGER, DOWN, KNEEL, VICTORY, DEFEATED, TAUNT,
-  POSE_SIZE, IDX, approachPose, lerpPose,
+  POSE_SIZE, IDX, approachPose, lerpPose, makePose,
 } from './poses.js';
 
+// Wrestler's back-arch for the suplex
+const BRIDGE = makePose({
+  tilt: [-0.45, 0], pelvisY: -0.18, pelvis: [0, 0, 0], spine: [-0.9, 0, 0], head: [-0.6, 0, 0],
+  lSh: [-2.9, 0, 0.35], lEl: -0.7, rSh: [-2.9, 0, -0.35], rEl: -0.7, lHip: [-0.3, 0, 0.12], lKn: 0.8, rHip: [-0.3, 0, -0.12], rKn: 0.8,
+});
+
 export function emptyIntent() {
-  return { moveX: 0, moveZ: 0, sprint: false, block: false, light: false, heavy: false, dodge: false, special: false, lock: true };
+  return { moveX: 0, moveZ: 0, sprint: false, block: false, light: false, heavy: false, dodge: false, special: false, style: false, lock: true };
 }
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -37,12 +44,20 @@ export class Fighter {
       defense: 1, regen: 1, recovery: 1, meterGain: 1, cooldown: 1, ...o.stats,
     };
     this.model = new FighterModel(o.look, this.accent);
+    this.setStyle(o.style);
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3(); // knockback / impulses
     this.moveVel = new THREE.Vector3(); // walking
     this.pose = Float32Array.from(GUARD);
     this._target = new Float32Array(POSE_SIZE);
     this.reset();
+  }
+
+  /** Fighting style: decides the special (E) and the style move (L). */
+  setStyle(id) {
+    this.style = styleOf(id);
+    this.specialAtk = ATTACKS[this.style.special];
+    this.styleAtk = ATTACKS[this.style.move];
   }
 
   reset() {
@@ -72,7 +87,11 @@ export class Fighter {
     this.dodgeDir = new THREE.Vector3();
     this.dodgeCooldown = 0;
     this.staminaDelay = 0;
-    this.knockdowns = 0;
+    this.knockdowns = 0; // count toward knockdown wear (takedowns don't)
+    this.downs = 0; // every time they hit the mat
+    this.bleed = 0;
+    this.bleedTick = 0;
+    this.thrower = null;
     this.combo = 0;
     this.comboTimer = 0;
     this.lockOn = true;
@@ -115,7 +134,7 @@ export class Fighter {
     return this.state === 'idle' || this.state === 'block';
   }
   get isDown() {
-    return this.state === 'knockdown' || this.state === 'down' || this.state === 'ko' || this.state === 'getup';
+    return this.state === 'knockdown' || this.state === 'down' || this.state === 'ko' || this.state === 'getup' || this.state === 'thrown';
   }
   get forward() {
     return { x: Math.sin(this.facing), z: Math.cos(this.facing) };
@@ -217,9 +236,20 @@ export class Fighter {
     if (this.balanceDelay <= 0) this.balance = Math.max(0, this.balance - FIGHTER.balanceDecay * dt);
     this.stepped = false;
     this.lockOn = intent.lock !== false;
+    if (this.bleed > 0) {
+      // an open cut keeps bleeding for a while (can't kill on its own)
+      this.bleed -= dt;
+      if (this.inFight && this.state !== 'ko') this.health = Math.max(1, Math.min(this.health, this.health - 1.6 * dt));
+      this.bleedTick -= dt;
+      if (this.bleedTick <= 0) {
+        this.bleedTick = 0.28;
+        events.push({ type: 'bleed', fighter: this });
+      }
+    }
 
     // Input buffer: presses are remembered briefly so combos feel forgiving.
     if (intent.special) this._buffer('special');
+    else if (intent.style) this._buffer('style');
     else if (intent.heavy) this._buffer('heavy');
     else if (intent.light) this._buffer('light');
     if (this.buffer) {
@@ -284,7 +314,8 @@ export class Fighter {
         const earlyHitCancel = this.attackHit && t >= a.startup + a.active * 0.5;
         if (this.buffer && (inCancel || earlyHitCancel)) {
           let next = null;
-          if (this.buffer === 'special' && this.specialReady) next = ATTACKS.special;
+          if (this.buffer === 'special' && this.specialReady) next = this.specialAtk;
+          else if (this.buffer === 'style') next = this._canFinishWithStyle(a, opp) ? this.styleAtk : null;
           else if (this.buffer !== 'special') next = chainAttack(a, this.buffer);
           if (next) {
             this.buffer = null;
@@ -318,6 +349,26 @@ export class Fighter {
         break;
       case 'knockdown':
         if (this.stateTime >= 0.75) this.setState('down');
+        break;
+      case 'thrown': {
+        // carried over the thrower's head (suplex), then slammed behind them
+        const th = this.thrower;
+        const u = Math.min(1, this.stateTime / 0.75);
+        const fx = Math.sin(th.facing);
+        const fz = Math.cos(th.facing);
+        const d = 0.75 * Math.cos(u * Math.PI);
+        this.pos.x = th.pos.x + fx * d;
+        this.pos.z = th.pos.z + fz * d;
+        this.vel.set(0, 0, 0);
+        this.moveVel.set(0, 0, 0);
+        if (u >= 1) {
+          this.facing = th.facing;
+          events.push({ type: 'throwLand', attacker: th, defender: this });
+        }
+        break;
+      }
+      case 'throwing':
+        if (this.stateTime >= this.stateDur) this.setState('idle');
         break;
       case 'getup':
         if (this.stateTime >= 0.75) {
@@ -391,6 +442,12 @@ export class Fighter {
     this.bufferTime = 0.28;
   }
 
+  /** The style move can end any standing combo, but nothing chains out of it (or a special / ground move). */
+  _canFinishWithStyle(a, opp) {
+    if (a.style || a.kind === 'special' || a.ground) return false;
+    return !(opp && opp.groundTarget);
+  }
+
   _groundDist(opp) {
     const gp = opp.groundPoint();
     return Math.hypot(gp.x - this.pos.x, gp.z - this.pos.z);
@@ -408,10 +465,12 @@ export class Fighter {
     if (this.buffer) {
       let atk = null;
       if (this.buffer === 'special') {
-        if (this.specialReady) atk = ATTACKS.special;
+        if (this.specialReady) atk = this.specialAtk;
         else events.push({ type: 'specialNotReady', fighter: this });
       } else if (opp && opp.groundTarget && this._groundDist(opp) < 2.2) {
-        atk = this.buffer === 'heavy' ? ATTACKS.soccerKick : ATTACKS.stomp;
+        atk = this.buffer === 'light' ? ATTACKS.stomp : ATTACKS.soccerKick;
+      } else if (this.buffer === 'style') {
+        atk = this.styleAtk;
       } else atk = chainAttack(null, this.buffer);
       this.buffer = null;
       if (atk) {
@@ -459,12 +518,22 @@ export class Fighter {
     this.setState('stagger', dur);
   }
 
-  knockDown() {
-    this.knockdowns++;
+  /** wear=false for takedowns: down on the mat, but it doesn't count toward knockdown wear. */
+  knockDown(wear = true) {
+    if (wear) this.knockdowns++;
+    this.downs++;
     this.setState('knockdown');
     this.balance = 0;
     this.mash = 0;
     this.combo = 0;
+  }
+
+  /** Grabbed for a throw: carried by the thrower until slammed. */
+  grabbedBy(thrower) {
+    this.setState('thrown');
+    this.thrower = thrower;
+    this.combo = 0;
+    this.balance = 0;
   }
 
   knockOut() {
@@ -592,6 +661,17 @@ export class Fighter {
         T[IDX.head] += Math.sin(time * 1.3) * 0.08;
         rate = 5;
         break;
+      case 'thrown': {
+        T.set(STAGGER);
+        T[IDX.lSh] = -2.4;
+        T[IDX.rSh] = -2.6;
+        rate = 20;
+        break;
+      }
+      case 'throwing':
+        T.set(this.stateTime < 0.8 ? BRIDGE : GUARD);
+        rate = this.stateTime < 0.8 ? 9 : 10;
+        break;
       case 'getup':
         T.set(this.stateTime < 0.4 ? KNEEL : GUARD);
         rate = this.stateTime < 0.4 ? 9 : 12;
@@ -614,6 +694,12 @@ export class Fighter {
     }
 
     approachPose(this.pose, T, 1 - Math.exp(-rate * dt));
+    if (this.state === 'thrown') {
+      // flipped over the thrower: lifted along the arc and rotated head-first
+      const u = Math.min(1, this.stateTime / 0.75);
+      this.pose[IDX.root] = Math.sin(u * Math.PI) * 1.35;
+      this.pose[IDX.tilt] = -u * 2.8;
+    }
     this.model.root.position.copy(this.pos);
     this.model.root.rotation.y = this.facing;
     this.model.apply(this.pose, spinYaw);

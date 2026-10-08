@@ -107,6 +107,9 @@ const handlers = {
     if (ok) game.refreshPlayerStats();
     return ok;
   },
+  onStyleChange() {
+    game.refreshPlayerStats();
+  },
   onLookChange() {
     game.buildPlayer();
     game.toMenu();
