@@ -554,6 +554,7 @@ await ev(() => {
   const p = g.player;
   g.ai.mode = 'fight';
   g.ai.p.aggression = 1;
+  g.ai.d.reads = true; // 100% chance to go for the ground kicks (otherwise 95%)
   p.knockDown();
   g._beginKnockdown(p, g.opp, false);
   g.match.getUpAt = 99;
@@ -739,6 +740,91 @@ await page.keyboard.press('Escape');
 await step(2);
 await page.click('#p-quit');
 
+console.log('— Bare knuckles');
+check(await ev(() => {
+  const g = window.__underground.game;
+  const m = g.player.model;
+  return m.lGlove.geometry.type === 'BoxGeometry' && !m.lGlove.parent.children.some((c) => c.geometry && c.geometry.type === 'SphereGeometry');
+}), 'fighters fight bare-knuckle (no boxing gloves)');
+
+console.log('— The Crucible');
+check(await page.isVisible('#screen-menu [data-action="crucible"]'), 'menu has THE CRUCIBLE');
+const cashBefore = await ev(() => window.__underground.prog.data.cash);
+await page.click('#screen-menu [data-action="crucible"]');
+check(await page.isVisible('#screen-crucible.active'), 'Crucible screen opens');
+check((await page.$$('#cru-warrior .card')).length >= 4 && (await page.$$('#cru-opp .card')).length >= 4, 'choose a Kronari warrior and an opponent');
+await page.click('#cru-warrior .card[data-id="seryn"]');
+await page.click('#cru-opp .card[data-id="ilyon"]');
+await shot('15-crucible-select');
+await page.click('#cru-go');
+await step(5);
+const cru = await ev(() => {
+  const g = window.__underground.game;
+  return { mode: g.match.mode, t: g.match.timeLeft, title: g.player.title, hp: g.player.stats.maxHealth, ohp: g.opp.stats.maxHealth, opp: g.opp.id, theme: g.arena.theme, style: g.player.specialAtk.id };
+});
+check(cru.mode === 'crucible' && cru.title === 'SERYN KAEL' && cru.opp === 'ilyon', 'you fight as the chosen Kronari warrior');
+check(cru.hp >= 900 && cru.ohp >= 900, `Kronari have huge health (${cru.hp} vs ${cru.ohp})`);
+check(cru.t === Infinity, 'no time limit');
+check(cru.theme === 'crucible', 'the arena switches to furnace lighting');
+check(cru.style === 'tornadoKick', 'the warrior keeps their own fighting style');
+await press('Space');
+await step(3);
+check(/∞/.test(await page.textContent('#hud-timer')), 'HUD clock shows ∞');
+await faceOff(1.1);
+await recordEvents();
+await press('KeyJ');
+await step(30);
+evs = await events();
+const jabDmg = await ev(() => window.__underground.game.opp.stats.maxHealth - window.__underground.game.opp.health);
+check(jabDmg >= 8, `super strength: a jab does ${jabDmg.toFixed(1)} damage`);
+await faceOff(1.1);
+const kb0 = await ev(() => window.__underground.game.opp.pos.z);
+await press('KeyK');
+await step(40);
+const kb1 = await ev(() => window.__underground.game.opp.pos.z);
+check(kb1 - kb0 > 2, `heavy hits send them flying (${(kb1 - kb0).toFixed(1)}m)`);
+check(await ev(() => window.__underground.game.effects.lensBlood.some((b) => b.life > 0)), 'big hits spatter blood on the screen');
+check(await ev(() => window.__underground.game.effects.splats.filter((m) => m.visible).length) >= 6, 'extra gore on the mat');
+await shot('16-crucible-fight');
+await ev(() => {
+  window.__underground.game.match.elapsed = 600;
+});
+await step(30);
+check(await ev(() => window.__underground.game.state) === 'fight', 'still fighting after 10 minutes (no clock)');
+await faceOff(1.1);
+await ev(() => {
+  window.__underground.game.opp.health = 5;
+});
+await press('KeyK');
+await step(40);
+check((await st()).state === 'ko', 'Kronari can still be killed');
+await step(30, 1 / 30);
+await shot('17-crucible-kill');
+await step(300, 1 / 30);
+check(await page.isVisible('#screen-results.active') && /EXHIBITION/.test(await page.textContent('#r-rewards')), 'Crucible results (exhibition)');
+check(await ev(() => window.__underground.prog.data.cash) === cashBefore, 'no career cash from the Crucible');
+await page.click('#r-actions button:has-text("MENU")');
+check(await ev(() => !window.__underground.game.player.crucible && window.__underground.game.arena.theme === 'default' && window.__underground.game.combat.damageMult === 1), 'back to your own fighter and normal rules afterwards');
+const cruSoak = await ev(() => {
+  const U = window.__underground;
+  const g = U.game;
+  const { KRONARI } = U;
+  g.startFight(KRONARI[2], 'crucible', null, KRONARI[0]);
+  g.skipIntro();
+  g.autopilot = new U.AIController(KRONARI[0], 'hard');
+  let n = 0;
+  while (g.state !== 'results' && n < 60 * 900) {
+    g.update(1 / 60);
+    n++;
+  }
+  g.autopilot = null;
+  const out = { done: g.state === 'results', secs: Math.round(g.match.elapsed), kd: g.player.knockdowns + g.opp.knockdowns };
+  U.handlers.onResultsGo('menu');
+  return out;
+});
+console.log(`      Kronari AI vs AI: ${cruSoak.secs}s, knockdowns ${cruSoak.kd}`);
+check(cruSoak.done, 'Kronari fights end in a death (no clock needed)');
+
 console.log('— Fighter & settings screens');
 await page.click('#screen-menu [data-action="fighter"]');
 check(await page.isVisible('#screen-fighter.active'), 'fighter screen opens');
@@ -775,7 +861,7 @@ const soak = await ev(() => {
       h(e);
     };
     let n = 0;
-    while (g.state !== 'results' && n < 60 * 200) {
+    while (g.state !== 'results' && n < 60 * 480) {
       g.update(1 / 60);
       n++;
     }

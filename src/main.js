@@ -1,6 +1,6 @@
 // Entry point: renderer + scene setup, the app-level screen flow and the main loop.
 import * as THREE from 'three';
-import { OPPONENTS, TRAINING_DUMMY, TOURNAMENT } from './config.js';
+import { OPPONENTS, TRAINING_DUMMY, TOURNAMENT, KRONARI } from './config.js';
 import { ATTACKS } from './attacks.js';
 import { AudioEngine } from './audio.js';
 import { Progression } from './progression.js';
@@ -42,6 +42,7 @@ const dom = {
   hurt: document.getElementById('fx-hurt'),
   lines: document.getElementById('fx-lines'),
   numbers: document.getElementById('dmg-numbers'),
+  lens: document.getElementById('fx-lens'),
 };
 
 let tournament = null;
@@ -67,6 +68,7 @@ const handlers = {
     audio.init();
     if (action === 'fight') app.push('select');
     else if (action === 'tournament') app.push('tournament');
+    else if (action === 'crucible') app.push('crucible');
     else if (action === 'training') {
       ui.show(null);
       game.startFight(TRAINING_DUMMY, 'training');
@@ -146,9 +148,14 @@ const handlers = {
     if (screen !== 'menu') app.push(screen);
   },
   onRematch() {
-    const profile = game.match.profile;
+    const { profile, mode, warrior } = game.match;
     ui.show(null);
-    game.startFight(profile, 'fight');
+    game.startFight(profile, mode === 'crucible' ? 'crucible' : 'fight', null, warrior);
+  },
+  onCrucibleGo() {
+    const { warrior, opp } = ui.cru;
+    ui.show(null);
+    game.startFight(opp, 'crucible', null, warrior);
   },
 };
 
@@ -209,7 +216,7 @@ requestAnimationFrame(frame);
 
 // Debug / test hook
 window.__underground = {
-  game, prog, ui, handlers, audio, input, OPPONENTS, ATTACKS, AIController,
+  game, prog, ui, handlers, audio, input, OPPONENTS, KRONARI, ATTACKS, AIController,
   frozen: false,
   /** Advance the game n frames of dt seconds without rendering (tests). */
   step(n, dt = 1 / 60) {

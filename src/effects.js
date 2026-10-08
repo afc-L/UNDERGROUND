@@ -136,6 +136,15 @@ export class Effects {
 
     // Blood: droplets plus floor splatter decals that stay for the whole fight
     this.bloodOn = true;
+    this.gore = 1; // The Crucible turns this way up
+    // blood hitting the camera lens (DOM overlay blobs)
+    this.lensBlood = [];
+    for (let i = 0; i < 8; i++) {
+      const el = document.createElement('div');
+      el.className = 'lens-blood';
+      dom.lens.appendChild(el);
+      this.lensBlood.push({ el, life: 0 });
+    }
     this.bloodDrops = new ParticlePool(scene, 360, { additive: false, size: 0.075, fade: false, texture: radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)') });
     this.bloodDrops.points.material.opacity = 0.95;
     const splatGeo = new THREE.PlaneGeometry(1, 1);
@@ -325,21 +334,42 @@ export class Effects {
 
   /** Spray of droplets from a clean hit, plus splatter landing on the mat in the hit direction. */
   bloodSpray(point, level, dir) {
-    const n = 6 + level * 9;
+    const g = this.gore;
+    const n = Math.round((6 + level * 9) * g);
     for (let i = 0; i < n; i++) {
       const sp = 1.5 + Math.random() * (1.5 + level * 0.9);
       const vx = (Math.random() - 0.5) * 1.6 + (dir ? dir.x * sp : 0);
       const vz = (Math.random() - 0.5) * 1.6 + (dir ? dir.z * sp : 0);
       const vy = 0.5 + Math.random() * 2.2;
       const shade = 0.45 + Math.random() * 0.3;
-      this.bloodDrops.emit(point.x, point.y, point.z, vx, vy, vz, shade, 0.02, 0.03, 0.45 + Math.random() * 0.35, -9.8, 0.4);
+      const boost = g > 1 ? 1 + Math.random() * 0.8 : 1;
+      this.bloodDrops.emit(point.x, point.y, point.z, vx * boost, vy * boost, vz * boost, shade, 0.02, 0.03, 0.45 + Math.random() * 0.35, -9.8, 0.4);
     }
-    const splats = Math.ceil(level / 2) + (Math.random() < 0.5 ? 1 : 0);
+    const splats = Math.round((Math.ceil(level / 2) + (Math.random() < 0.5 ? 1 : 0)) * g);
     for (let i = 0; i < splats; i++) {
-      const d = 0.3 + Math.random() * (0.4 + level * 0.2);
+      const d = 0.3 + Math.random() * (0.4 + level * 0.2) * (g > 1 ? 1.6 : 1);
       const x = point.x + (dir ? dir.x * d : 0) + (Math.random() - 0.5) * 0.5;
       const z = point.z + (dir ? dir.z * d : 0) + (Math.random() - 0.5) * 0.5;
-      this.splat(x, z, 0.12 + Math.random() * 0.12 + level * 0.05);
+      this.splat(x, z, (0.12 + Math.random() * 0.12 + level * 0.05) * (g > 1 ? 1.4 : 1));
+    }
+  }
+
+  /** Blood spattering the camera lens (screen overlay), for the goriest hits. */
+  lensSplatter(count = 2) {
+    if (!this.bloodOn) return;
+    for (let i = 0; i < count; i++) {
+      const b = this.lensBlood.find((x) => x.life <= 0) || this.lensBlood[(Math.random() * this.lensBlood.length) | 0];
+      b.life = 1.6 + Math.random();
+      const size = 80 + Math.random() * 220;
+      const edge = Math.random() < 0.75; // mostly near the edges, keep the fight readable
+      const x = edge ? (Math.random() < 0.5 ? Math.random() * 18 : 82 + Math.random() * 18) : 20 + Math.random() * 60;
+      const y = Math.random() * 100;
+      b.el.style.width = `${size}px`;
+      b.el.style.height = `${size * (0.6 + Math.random() * 0.6)}px`;
+      b.el.style.left = `calc(${x}% - ${size / 2}px)`;
+      b.el.style.top = `calc(${y}% - ${size / 2}px)`;
+      b.el.style.transform = `rotate(${Math.random() * 360}deg)`;
+      b.el.style.opacity = '0.85';
     }
   }
 
@@ -363,6 +393,10 @@ export class Effects {
 
   clearBlood() {
     for (const m of this.splats) m.visible = false;
+    for (const b of this.lensBlood) {
+      b.life = 0;
+      b.el.style.opacity = '0';
+    }
   }
 
   // ---- Screen effects ------------------------------------------------------------------------
@@ -431,6 +465,12 @@ export class Effects {
     }
     this.light.intensity *= Math.exp(-realDt * 14);
 
+    for (const b of this.lensBlood) {
+      if (b.life <= 0) continue;
+      b.life -= realDt;
+      b.el.style.opacity = Math.max(0, Math.min(0.85, b.life * 0.6)).toFixed(2);
+      if (b.life <= 0) b.el.style.opacity = '0';
+    }
     // DOM overlays (real-time decay so they stay readable during slow motion)
     this.flashLevel *= Math.exp(-realDt * 10);
     this.redLevel *= Math.exp(-realDt * 3);

@@ -71,14 +71,17 @@ export class FighterModel {
     const top = L.top && L.top !== 'none' ? this._mat(L.topColor, 0.85) : skin;
     const shorts = this._mat(L.shorts, 0.8);
     const trim = this._mat(L.shortsTrim || '#ffffff', 0.7);
-    const gloves = this._mat(L.gloves, 0.35, 0.05);
-    this.gloveMat = gloves;
+    // Bare knuckles: fists are skin, with their own material so they can get bloody
+    const fists = this._mat(L.skin, 0.45);
+    this.gloveMat = fists;
+    const suit = L.top === 'suit';
+    const legsMat = suit ? this._mat(L.legs || L.topColor, 0.6, 0.15) : skin;
     const shoes = this._mat(L.shoes || '#222', 0.8);
     const hairMat = this._mat(L.hairColor || '#111', 0.9);
     const dark = this._mat('#0b0b0d', 0.6);
     const acc = this._mat(L.accessoryColor || '#ffffff', 0.5, L.accessory === 'chain' ? 0.8 : 0);
-    const sleeves = L.top === 'tee' || L.top === 'hoodie' ? top : skin;
-    const forearmMat = L.top === 'hoodie' ? top : skin;
+    const sleeves = L.top === 'tee' || L.top === 'hoodie' || suit ? top : skin;
+    const forearmMat = L.top === 'hoodie' || suit ? top : skin;
 
     const thighLen = 0.44 * h;
     const shinLen = 0.44 * h;
@@ -148,7 +151,24 @@ export class FighterModel {
       default:
         break;
     }
-    if (L.beard) this._mesh(box(hr * 1.3, hr * 0.6, hr * 0.5), hairMat, this.head, 0, hr * 0.25, hr * 0.62);
+    if (L.beard === 'mustache') this._mesh(box(hr * 0.95, hr * 0.16, hr * 0.2), hairMat, this.head, 0, hr * 0.62, hr * 0.98);
+    else if (L.beard) this._mesh(box(hr * 1.3, hr * 0.6, hr * 0.5), hairMat, this.head, 0, hr * 0.25, hr * 0.62);
+    if (L.scar) this._mesh(box(0.012, hr * 0.7, 0.012), this._mat('#d9a0a0', 0.6), this.head, -0.05, hr * 1.05, hr * 0.92).rotation.z = 0.35;
+    if (L.cape) {
+      // cape hung from the shoulders, swaying behind
+      const capeGeo = cached('cape', () => {
+        const g = new THREE.PlaneGeometry(0.5, 1.05, 1, 3);
+        g.translate(0, -0.525, 0);
+        return g;
+      });
+      const cape = new THREE.Mesh(capeGeo, new THREE.MeshStandardMaterial({ color: L.cape, roughness: 0.8, side: THREE.DoubleSide, flatShading: true }));
+      this.materials.push(cape.material);
+      cape.position.set(0, chestLen * 0.95, -0.15 * b);
+      cape.rotation.x = 0.12;
+      cape.castShadow = true;
+      this.chest.add(cape);
+      this.cape = cape;
+    }
     switch (L.accessory) {
       case 'headband':
         this._mesh(cyl(hr * 0.98, hr * 0.98, 0.05, 10), acc, this.head, 0, hr * 1.35, 0.0).scale.set(0.92, 1, 1.02);
@@ -185,9 +205,10 @@ export class FighterModel {
       el.position.y = -upLen;
       sh.add(el);
       this._mesh(capsule(0.052 * b, foreLen - 0.08), forearmMat, el, 0, -foreLen / 2 + 0.01, 0);
-      this._mesh(cyl(0.058 * b, 0.058 * b, 0.06, 7), gloves, el, 0, -foreLen + 0.03, 0); // cuff
-      const g = this._mesh(sphere(0.085, 8, 6), gloves, el, 0, -foreLen - 0.04, 0.012);
-      g.scale.set(0.95, 1.1, 1.2);
+      // bare fist: palm block + knuckle row
+      const g = this._mesh(box(0.075 * b, 0.1, 0.085), fists, el, 0, -foreLen - 0.035, 0.008);
+      this._mesh(box(0.08 * b, 0.03, 0.03), fists, g, 0, -0.045, 0.03);
+      this._mesh(box(0.025, 0.05, 0.03), fists, g, side * 0.035, 0.0, 0.035); // thumb
       return { sh, el, glove: g };
     };
     const lArm = makeArm(1);
@@ -205,14 +226,15 @@ export class FighterModel {
       hip.rotation.order = 'YXZ';
       hip.position.set(side * 0.1 * b, -0.05, 0);
       this.pelvis.add(hip);
-      this._mesh(capsule(0.085 * b, thighLen - 0.1), skin, hip, 0, -thighLen / 2, 0);
+      this._mesh(capsule(0.085 * b, thighLen - 0.1), legsMat, hip, 0, -thighLen / 2, 0);
       this._mesh(capsule(0.1 * b, thighLen * 0.42), shorts, hip, 0, -thighLen * 0.28, 0); // shorts leg
       this._mesh(cyl(0.104 * b, 0.104 * b, 0.035, 8), trim, hip, 0, -thighLen * 0.5, 0);
       const kn = new THREE.Group();
       kn.position.y = -thighLen;
       hip.add(kn);
-      this._mesh(capsule(0.066 * b, shinLen - 0.1), skin, kn, 0, -shinLen / 2, 0);
+      this._mesh(capsule(0.066 * b, shinLen - 0.1), legsMat, kn, 0, -shinLen / 2, 0);
       this._mesh(box(0.11 * b, 0.08, 0.25), shoes, kn, 0, -shinLen - 0.02, 0.05);
+      if (suit) this._mesh(cyl(0.075 * b, 0.07 * b, 0.2, 7), shoes, kn, 0, -shinLen + 0.08, 0); // tall boots
       return { hip, kn };
     };
     const lLeg = makeLeg(1);
@@ -246,7 +268,7 @@ export class FighterModel {
       patch(this.chest, 0.03, 0.2, 0.012, -0.07, chestLen * 0.5, front, 0.72),
       patch(this.chest, 0.06, 0.05, 0.012, 0.09, chestLen * 0.82, front, 0.86),
     ];
-    this.gloveBase = new THREE.Color(L.gloves);
+    this.gloveBase = new THREE.Color(L.skin);
     this._bloodAmt = 0;
   }
 
@@ -287,6 +309,10 @@ export class FighterModel {
 
   /** Emissive hit flash (0..1) and special-move glove glow (0..1). */
   updateFx(dt) {
+    if (this.cape) {
+      this._capeT = (this._capeT || 0) + dt;
+      this.cape.rotation.x = 0.15 + Math.sin(this._capeT * 2.3) * 0.06 + Math.min(0.9, this.capeLift || 0);
+    }
     this.flash = Math.max(0, this.flash - dt * 6);
     const f = this.flash * 0.55;
     for (const m of this.materials) m.emissive.setRGB(f, f, f);

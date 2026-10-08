@@ -51,3 +51,20 @@ export function opponentStats(profile) {
     cooldown: 1.2,
   };
 }
+
+/** Kronari warriors (The Crucible): raw stats, no health scaling, built to take punishment. */
+export function kronariStats(profile) {
+  const s = profile.stats;
+  return {
+    maxHealth: s.health,
+    maxStamina: s.stamina,
+    power: s.power,
+    speed: s.speed,
+    attackSpeed: 0.92 + s.speed * 0.1,
+    defense: s.defense,
+    regen: 1.3,
+    recovery: 1.3,
+    meterGain: 1,
+    cooldown: 1,
+  };
+}

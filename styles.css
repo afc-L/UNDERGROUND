@@ -307,3 +307,21 @@ b { color: #fff; }
   .hud-name { font-size: 16px; }
   #hud-timer { font-size: 34px; }
 }
+
+/* ---------- The Crucible ---------- */
+.crucible-btn { border-color: #ff4400; color: #ffb37a; }
+.crucible-btn:hover:not(:disabled), .crucible-btn:focus { background: #c2410c; border-color: #ff6a00; }
+.crucible-screen { background: linear-gradient(180deg, rgba(30, 6, 2, 0.9), rgba(20, 4, 2, 0.75) 40%, rgba(20, 4, 2, 0.92)); }
+.crucible-screen .screen-head h2 { text-shadow: 0 0 18px rgba(255, 80, 0, 0.7); color: #ffd2b0; }
+.cru-desc { padding: 0 34px; max-width: 760px; color: #d6b8a8; font-size: 14px; margin: 4px 0 0; }
+.cru-h { font-family: var(--display); font-weight: normal; letter-spacing: 4px; color: #ff8a3d; margin: 18px 34px 0; font-size: 20px; }
+.cru-actions { padding: 0 34px 34px; }
+.card.kronari.chosen { border-color: var(--accent); box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent); background: rgba(40, 10, 6, 0.9); }
+.card.kronari .cru-tag { color: var(--accent); }
+#fx-lens { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lens-blood {
+  position: absolute; opacity: 0; mix-blend-mode: multiply;
+  background: radial-gradient(ellipse at 45% 40%, rgba(120, 0, 8, 0.95) 0%, rgba(110, 0, 8, 0.85) 38%, rgba(90, 0, 6, 0.4) 58%, transparent 72%);
+  border-radius: 42% 58% 61% 39% / 47% 39% 61% 53%;
+  filter: blur(1px);
+}

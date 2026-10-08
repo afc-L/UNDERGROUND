@@ -275,3 +275,102 @@ export const DEFAULT_SETTINGS = {
   damageNumbers: true,
   blood: true,
 };
+
+// ---------------------------------------------------------------------------------------------
+// THE CRUCIBLE: super-powered Kronari warriors (an original alien warrior race). Huge health,
+// triple damage, double knockback, extra gore, no clock, no flying.
+export const CRUCIBLE = {
+  name: 'THE CRUCIBLE',
+  damageMult: 3,
+  knockbackMult: 2.4,
+  goreScale: 3,
+  healthLabel: 'KRONARI CONSTITUTION',
+};
+
+export const KRONARI = [
+  {
+    id: 'vorath',
+    title: 'VORATH',
+    name: 'Vorath the Unbroken',
+    style: 'Old general. Grabs and breaks.',
+    blurb: 'Has ended wars by himself. Bored by this one.',
+    fightStyle: 'wrestling',
+    difficulty: 'hard',
+    stats: { health: 1100, power: 1.15, speed: 1.0, defense: 1.2, stamina: 160 },
+    personality: { aggression: 0.7, heavyPref: 0.45, kickPref: 0.2, range: 1.15, specialUse: 1, evasive: 0 },
+    look: {
+      skin: '#e3b796', hair: 'short', hairColor: '#e8e8ea', beard: 'mustache', top: 'suit', topColor: '#141418', legs: '#141418',
+      shorts: '#141418', shortsTrim: '#8b1020', shoes: '#8b1020', cape: '#8b1020', accessory: 'none',
+      build: { height: 1.1, bulk: 1.22, arms: 1.05, head: 1.0, belly: 0 },
+    },
+    accent: '#e11d48',
+  },
+  {
+    id: 'seryn',
+    title: 'SERYN KAEL',
+    name: 'Seryn Kael',
+    style: 'Fastest blade in the Kronari line.',
+    blurb: 'Kicks hard enough to fold steel.',
+    fightStyle: 'kickboxing',
+    difficulty: 'hard',
+    stats: { health: 950, power: 1.05, speed: 1.25, defense: 1.0, stamina: 170 },
+    personality: { aggression: 0.6, heavyPref: 0.3, kickPref: 0.6, range: 1.45, specialUse: 1, evasive: 0.25 },
+    look: {
+      skin: '#c9946d', hair: 'long', hairColor: '#111114', top: 'suit', topColor: '#c8ccd6', legs: '#2a3550',
+      shorts: '#2a3550', shortsTrim: '#c8ccd6', shoes: '#2a3550', accessory: 'none',
+      build: { height: 1.03, bulk: 0.95, arms: 1.05, head: 0.98, belly: 0 },
+    },
+    accent: '#7dd3fc',
+  },
+  {
+    id: 'draxus',
+    title: 'DRAXUS',
+    name: 'Draxus the Butcher',
+    style: 'Pure violence. No technique needed.',
+    blurb: 'Collects teeth.',
+    fightStyle: 'brawling',
+    difficulty: 'hard',
+    stats: { health: 1250, power: 1.3, speed: 0.88, defense: 1.1, stamina: 150 },
+    personality: { aggression: 0.95, heavyPref: 0.55, kickPref: 0.15, range: 1.1, specialUse: 1, evasive: 0, defensive: -0.2 },
+    look: {
+      skin: '#9c6a4c', hair: 'bald', hairColor: '#222', beard: true, scar: true, top: 'suit', topColor: '#5a1015', legs: '#1a1a1d',
+      shorts: '#1a1a1d', shortsTrim: '#5a1015', shoes: '#1a1a1d', accessory: 'none',
+      build: { height: 1.15, bulk: 1.38, arms: 1.1, head: 1.05, belly: 0.05 },
+    },
+    accent: '#dc2626',
+  },
+  {
+    id: 'ilyon',
+    title: 'ILYON',
+    name: 'Ilyon, Heir of Kharos',
+    style: 'Young, proud, and quicker than he looks.',
+    blurb: 'Has never lost. Has never been hit hard.',
+    fightStyle: 'boxing',
+    difficulty: 'normal',
+    stats: { health: 1000, power: 1.1, speed: 1.12, defense: 1.0, stamina: 165 },
+    personality: { aggression: 0.75, heavyPref: 0.3, kickPref: 0.2, range: 1.2, specialUse: 1, evasive: 0.1 },
+    look: {
+      skin: '#f0c9a8', hair: 'short', hairColor: '#2b1d14', top: 'suit', topColor: '#14532d', legs: '#0b0b0d',
+      shorts: '#0b0b0d', shortsTrim: '#14532d', shoes: '#0b0b0d', cape: '#0b0b0d', accessory: 'none',
+      build: { height: 1.02, bulk: 1.02, arms: 1.0, head: 1.0, belly: 0 },
+    },
+    accent: '#22c55e',
+  },
+  {
+    id: 'kalla',
+    title: 'KALLA THRANE',
+    name: 'Kalla Thrane',
+    style: 'Executioner of the Kronari court.',
+    blurb: 'Knees first. Questions never.',
+    fightStyle: 'muaythai',
+    difficulty: 'hard',
+    stats: { health: 1050, power: 1.2, speed: 1.1, defense: 1.1, stamina: 160 },
+    personality: { aggression: 0.8, heavyPref: 0.4, kickPref: 0.4, range: 1.25, specialUse: 1, evasive: 0.1 },
+    look: {
+      skin: '#7a4f36', hair: 'mohawk', hairColor: '#f5c518', top: 'suit', topColor: '#0b0b0d', legs: '#0b0b0d',
+      shorts: '#0b0b0d', shortsTrim: '#f5c518', shoes: '#f5c518', cape: '#a1820f', accessory: 'none',
+      build: { height: 1.06, bulk: 1.1, arms: 1.05, head: 1.0, belly: 0 },
+    },
+    accent: '#f5c518',
+  },
+];

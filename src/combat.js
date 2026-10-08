@@ -27,7 +27,8 @@ export function impactPoint(attacker, defender, attack, out = new THREE.Vector3(
 export class Combat {
   constructor() {
     this.trainingInfinite = false;
-    this.damageMult = 1; // e.g. sudden death
+    this.damageMult = 1; // e.g. sudden death, The Crucible
+    this.knockbackMult = 1; // The Crucible: super strength sends people flying
   }
 
   /** Resolve both fighters' attacks against each other, then separate bodies. */
@@ -166,7 +167,7 @@ export class Combat {
     def.balance += atk.balance * (counter ? 1.3 : 1);
     def.balanceDelay = FIGHTER.balanceDelay;
 
-    const kb = atk.knockback * (counter ? 1.3 : 1);
+    const kb = atk.knockback * (counter ? 1.3 : 1) * this.knockbackMult;
     def.vel.set(dirX * kb, 0, dirZ * kb);
     // attacker recoil on big hits
     if (atk.impact >= 3) att.vel.set(-dirX * 0.8, 0, -dirZ * 0.8);
@@ -280,7 +281,7 @@ export class Combat {
     def.model.flash = 0.7;
     const nx = dist > 1e-4 ? dx / dist : 0;
     const nz = dist > 1e-4 ? dz / dist : 0;
-    def.vel.set(nx * atk.knockback, 0, nz * atk.knockback);
+    def.vel.set(nx * atk.knockback * this.knockbackMult, 0, nz * atk.knockback * this.knockbackMult);
     def.mash = Math.max(0, def.mash - 2); // getting kicked makes it harder to get up
     const point = new THREE.Vector3(gp.x, 0.28, gp.z);
     const ev = { type: 'hit', attacker: att, defender: def, attack: atk, damage, counter: null, combo, point, impact: atk.impact, ground: true };

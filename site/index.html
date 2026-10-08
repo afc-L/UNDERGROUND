@@ -129,6 +129,11 @@
   .styles .mv span { color: var(--neon); font-weight: 700; min-width: 14px; }
   .styles p { margin: 10px 0 0; color: var(--dim); font-size: 14px; }
 
+  .crucible { background: linear-gradient(180deg, #1a0503, var(--ink)); }
+  .crucible h2 { color: #ffd2b0; text-shadow: 0 0 24px rgba(255, 80, 0, 0.6); }
+  .kronari-list { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font-family: var(--mono); font-size: 13px; color: var(--dim); }
+  .kronari-list b { color: #ff8a3d; font-weight: 700; margin-right: 6px; }
+
   /* ---------- career strip ---------- */
   .career { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .career figure { margin: 0; }
@@ -166,6 +171,7 @@
       <a href="#card">Fight card</a>
       <a href="#fight">How it hits</a>
       <a href="#styles">Styles</a>
+      <a href="#crucible">Crucible</a>
       <a href="#controls">Controls</a>
       <a class="play-link" href="play.html">Play ▸</a>
     </nav>
@@ -184,7 +190,7 @@
         <a class="btn" href="play.html">Enter the pit <span class="arrow">▸</span></a>
         <a class="btn ghost" href="#controls">Learn the moves</a>
       </div>
-      <div class="facts"><span>Fights to the death</span><span>Free, runs in your browser</span><span>No account, no download</span><span>Keyboard to fight, mouse for camera</span><span>Progress saves locally</span></div>
+      <div class="facts"><span>Fights to the death</span><span>Bare knuckle</span><span>Free, runs in your browser</span><span>No account, no download</span><span>Keyboard to fight, mouse for camera</span><span>Progress saves locally</span></div>
     </div>
   </div>
 
@@ -293,6 +299,22 @@
         <article><h3>Kickboxing</h3><div class="mv"><span>E</span>Tornado Kick</div><div class="mv"><span>L</span>Head Kick</div><p>Hits from further away than anything else.</p></article>
         <article><h3>Wrestling</h3><div class="mv"><span>E</span>Suplex</div><div class="mv"><span>L</span>Double-Leg Takedown</div><p>Grab, lift, slam. Take them down, then use the boots.</p></article>
         <article><h3>Street Brawling</h3><div class="mv"><span>E</span>Bull Rush</div><div class="mv"><span>L</span>Headbutt</div><p>Dirty and direct. The headbutt always staggers.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="crucible" class="crucible">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <div class="eyebrow">Second game mode</div>
+          <h2>The Crucible</h2>
+        </div>
+        <p>Play as the Kronari: an original race of near-indestructible alien warriors. About 1000 health each, triple damage, bodies thrown into the cage, no clock, and the gore turned all the way up.</p>
+      </div>
+      <figure class="shot"><img src="img/crucible.jpg" alt="Two Kronari warriors in the furnace-lit Crucible, the infinite clock on the HUD" loading="lazy" /><figcaption>THE CRUCIBLE · NO CLOCK</figcaption></figure>
+      <div class="kronari-list">
+        <span><b>VORATH</b> Wrestling</span><span><b>SERYN KAEL</b> Kickboxing</span><span><b>DRAXUS</b> Street brawling</span><span><b>ILYON</b> Boxing</span><span><b>KALLA THRANE</b> Muay Thai</span>
       </div>
     </div>
   </section>

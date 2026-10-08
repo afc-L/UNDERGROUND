@@ -20,6 +20,7 @@
       <div id="fx-flash"></div>
       <div id="fx-grain"></div>
       <div id="dmg-numbers"></div>
+      <div id="fx-lens"></div>
 
       <!-- HUD -->
       <div id="hud" class="hidden">
@@ -93,6 +94,7 @@
           <nav class="menu-buttons">
             <button data-action="fight" class="btn primary">FIGHT</button>
             <button data-action="tournament" class="btn">TOURNAMENT</button>
+            <button data-action="crucible" class="btn crucible-btn">THE CRUCIBLE</button>
             <button data-action="training" class="btn">TRAINING</button>
             <button data-action="upgrades" class="btn">UPGRADES</button>
             <button data-action="fighter" class="btn">FIGHTER</button>
@@ -128,6 +130,21 @@
           <div class="tourney-prize" id="tourney-prize"></div>
           <div class="tourney-actions"><button class="btn primary" id="tourney-go">START</button><button class="btn" id="tourney-forfeit">FORFEIT RUN</button></div>
         </div>
+      </section>
+
+      <!-- The Crucible -->
+      <section id="screen-crucible" class="screen panel-screen crucible-screen">
+        <header class="screen-head">
+          <button class="btn back" data-action="back">◀ BACK</button>
+          <h2>THE CRUCIBLE</h2>
+          <div class="wallet" id="cru-wins"></div>
+        </header>
+        <p class="cru-desc">Kronari warriors: an alien race that can take a beating no human could survive. Triple damage, bodies thrown across the cage, no clock, extreme gore. Fight to the death. Exhibition only: no purse, no career rewards.</p>
+        <h3 class="cru-h">CHOOSE YOUR WARRIOR</h3>
+        <div class="cards" id="cru-warrior"></div>
+        <h3 class="cru-h">CHOOSE YOUR OPPONENT</h3>
+        <div class="cards" id="cru-opp"></div>
+        <div class="cru-actions"><button class="btn primary" id="cru-go">ENTER THE CRUCIBLE</button></div>
       </section>
 
       <!-- Upgrades -->

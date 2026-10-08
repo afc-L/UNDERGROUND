@@ -10,7 +10,8 @@ There's no backend, account, API key, database or external service. Three.js is 
 and every sound and the music are synthesized with the Web Audio API, so the game works fully
 offline. Every fight is a **death match**: it ends only when one fighter dies. Clean hits spray
 stylized blood that stays on the mat, and fighters get bloodier as their health drops. Turn
-**Blood** off in Settings for sparks and sweat only.
+**Blood** off in Settings for sparks and sweat only. Everyone fights **bare-knuckle**: no gloves,
+and fists get bloodier as the fight goes on.
 
 ## Running it
 
@@ -110,6 +111,12 @@ through, so dodge it with `Shift` instead. A blocked takedown gets stuffed and l
 * **FIGHT.** Pick an opponent from the ladder. The select screen shows each opponent's name,
   difficulty, fighting style, health, power, speed, defense and reward. Beat an opponent and
   earn enough reputation to unlock the next one.
+* **THE CRUCIBLE.** Play as one of five **Kronari**, an original race of near-indestructible alien
+  warriors (Vorath, Seryn Kael, Draxus, Ilyon, Kalla Thrane). Pick your warrior and your opponent.
+  Each Kronari has about 1000 health, hits for triple damage, and knocks people across the cage
+  into the fence. There's no clock, the gore is turned way up (heavy sprays, splatter everywhere,
+  blood hitting the screen, a huge pool on the kill), the arena burns furnace-red, and nobody flies.
+  It's an exhibition: no purse or career rewards, but your Crucible kills are counted.
 * **TOURNAMENT.** *The Pit Invitational* runs all six opponents back to back. One loss
   eliminates you. Winning pays a grand prize and the title.
 * **TRAINING.** Practice against a sparring partner that can't be killed. The move list is

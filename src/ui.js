@@ -1,6 +1,6 @@
 // DOM user interface: menus, opponent select, tournament, upgrades, fighter editor, settings,
 // HUD, notifications and results. UI never touches game rules; it calls handlers from main.js.
-import { OPPONENTS, DIFFICULTY, FIGHT, FIGHTER } from './config.js';
+import { OPPONENTS, DIFFICULTY, FIGHT, FIGHTER, KRONARI, CRUCIBLE } from './config.js';
 import { UPGRADES, MAX_UPGRADE, upgradeCost, playerStats } from './upgrades.js';
 import { xpForLevel } from './progression.js';
 import { ATTACKS } from './attacks.js';
@@ -76,6 +76,7 @@ export class UI {
     $('p-restart').addEventListener('click', () => { this._click(); this.h.onRestart(); });
     $('p-quit').addEventListener('click', () => { this._click(); this.h.onQuit(); });
     $('tourney-go').addEventListener('click', () => { this._click(); this.h.onTournamentGo(); });
+    $('cru-go').addEventListener('click', () => { this._click(); this.h.onCrucibleGo(); });
     $('tourney-forfeit').addEventListener('click', () => { this._click(); this.h.onTournamentForfeit(); });
     const name = $('f-name');
     name.addEventListener('input', () => {
@@ -93,7 +94,7 @@ export class UI {
     if (!name) return;
     const el = $(`screen-${name}`);
     if (el) el.classList.add('active');
-    const r = { menu: 'renderMenu', select: 'renderSelect', tournament: 'renderTournament', upgrades: 'renderUpgrades', fighter: 'renderFighter', settings: 'renderSettings' }[name];
+    const r = { menu: 'renderMenu', select: 'renderSelect', crucible: 'renderCrucible', tournament: 'renderTournament', upgrades: 'renderUpgrades', fighter: 'renderFighter', settings: 'renderSettings' }[name];
     if (r) this[r]();
     this._focusFirst();
   }
@@ -246,6 +247,47 @@ export class UI {
     });
   }
 
+  renderCrucible() {
+    if (!this.cru) this.cru = { warrior: KRONARI[0], opp: KRONARI[2] };
+    const sel = this.cru;
+    const card = (k, role) => {
+      const el = document.createElement('div');
+      const chosen = sel[role] === k;
+      el.className = `card kronari ${chosen ? 'chosen' : ''}`;
+      el.style.setProperty('--accent', k.accent);
+      const bar = (label, v) => `<div class="stat"><span>${label}</span><div class="sbar"><i style="width:${Math.round(Math.min(1, v) * 100)}%"></i></div></div>`;
+      el.innerHTML = `
+        <div class="c-title">${k.title}</div>
+        <div class="c-name">${esc(k.name)}</div>
+        <div class="c-style"><b class="c-fs">${styleOf(k.fightStyle).name}</b> · ${k.style}</div>
+        ${bar('HEALTH', k.stats.health / 1300)}
+        ${bar('POWER', (k.stats.power - 0.5) / 0.95)}
+        ${bar('SPEED', (k.stats.speed - 0.5) / 0.8)}
+        ${bar('DEFENSE', (k.stats.defense - 0.5) / 0.8)}
+        <div class="c-blurb">${k.blurb}</div>
+        <div class="c-reward"><span>${k.stats.health} HP</span><span class="cash">${ATTACKS[styleOf(k.fightStyle).special].name}</span></div>
+        ${chosen ? `<div class="c-diff cru-tag">${role === 'warrior' ? 'YOU' : 'OPPONENT'}</div>` : ''}`;
+      this._activatable(el);
+      el.addEventListener('click', () => {
+        sel[role] = k;
+        this._click();
+        if (role === 'opp') this.h.onPreview(k);
+        this.renderCrucible();
+        const again = $(`cru-${role}`).querySelector(`[data-id="${k.id}"]`);
+        if (again) again.focus({ focusVisible: true });
+      });
+      el.dataset.id = k.id;
+      return el;
+    };
+    for (const role of ['warrior', 'opp']) {
+      const wrap = $(`cru-${role}`);
+      wrap.innerHTML = '';
+      for (const k of KRONARI) wrap.appendChild(card(k, role));
+    }
+    $('cru-go').textContent = `ENTER THE CRUCIBLE: ${sel.warrior.title} VS ${sel.opp.title}`;
+    $('cru-wins').textContent = this.prog.data.crucibleWins ? `CRUCIBLE KILLS: ${this.prog.data.crucibleWins}` : '';
+  }
+
   renderTournament() {
     const t = this.h.getTournament();
     $('tourney-wallet').innerHTML = this._wallet();
@@ -324,7 +366,6 @@ export class UI {
       ${chipRow('TOP', 'top')}
       ${swatchRow('TOP COLOR', 'topColor')}
       ${swatchRow('SHORTS', 'shorts')}
-      ${swatchRow('GLOVES', 'gloves')}
       ${chipRow('EXTRA', 'accessory')}
       <div class="opt-row"><div class="lbl">BUILD</div>
         HEIGHT <input type="range" min="0.93" max="1.08" step="0.01" value="${L.build.height}" data-b="height" />
@@ -411,12 +452,12 @@ export class UI {
   // -------------------------------------------------------------------------------------------
   // Fight presentation
 
-  vsBanner(playerName, profile, tourney) {
+  vsBanner(playerName, profile, tourney, crucible = false) {
     $('vs-p').textContent = playerName;
     $('vs-o').textContent = profile.name;
     $('vs-o-title').textContent = profile.title;
     $('vs-o-style').textContent = `${profile.style.toUpperCase()} · ${DIFFICULTY[profile.difficulty].label}`;
-    $('vs-tourney').textContent = tourney ? `${tourney.name} — FIGHT ${tourney.round + 1} OF ${tourney.opponents.length}` : FIGHT.deathMatch ? 'DEATH MATCH · NO RULES · NO MERCY' : 'UNSANCTIONED BOUT';
+    $('vs-tourney').textContent = crucible ? `${CRUCIBLE.name} · NO CLOCK · NO MERCY` : tourney ? `${tourney.name} — FIGHT ${tourney.round + 1} OF ${tourney.opponents.length}` : FIGHT.deathMatch ? 'DEATH MATCH · NO RULES · NO MERCY' : 'UNSANCTIONED BOUT';
     $('vs').classList.remove('hidden');
   }
 
@@ -491,11 +532,11 @@ export class UI {
     e.oSp.parentElement.classList.toggle('ready', o.specialReady);
     if (e.pName.textContent !== p.name) e.pName.textContent = p.name;
     if (e.oName.textContent !== o.title) e.oName.textContent = o.title;
-    const t = m.suddenDeath ? 'SUDDEN DEATH' : fmtTime(m.timeLeft);
+    const t = m.suddenDeath ? 'SUDDEN DEATH' : Number.isFinite(m.timeLeft) ? fmtTime(m.timeLeft) : '∞';
     if (e.timer.textContent !== t) e.timer.textContent = t;
     e.timer.classList.toggle('urgent', (m.timeLeft < 15 || m.suddenDeath) && m.mode !== 'training');
     e.timer.classList.toggle('sd', !!m.suddenDeath);
-    const sub = m.mode === 'training' ? 'TRAINING' : m.tournament ? `FIGHT ${m.tournament.round + 1} / ${m.tournament.opponents.length}` : o.name;
+    const sub = m.mode === 'crucible' ? CRUCIBLE.name : m.mode === 'training' ? 'TRAINING' : m.tournament ? `FIGHT ${m.tournament.round + 1} / ${m.tournament.opponents.length}` : o.name;
     if (e.oppTitle.textContent !== sub) e.oppTitle.textContent = sub;
     if (this._kdP !== p.knockdowns) {
       this._kdP = p.knockdowns;
@@ -582,11 +623,11 @@ export class UI {
   // -------------------------------------------------------------------------------------------
   // Results
 
-  showResults({ result, stats, summary, profile, tournament, perfect }) {
+  showResults({ result, stats, summary, profile, tournament, perfect, crucible }) {
     this.clearOverlays();
     const won = result.won;
     const title = $('r-title');
-    const lethal = FIGHT.deathMatch && result.ko && !!summary;
+    const lethal = FIGHT.deathMatch && result.ko && (!!summary || !!crucible);
     title.textContent = won ? (tournament && tournament.done ? 'CHAMPION' : 'VICTORY') : lethal ? 'YOU DIED' : 'DEFEAT';
     title.className = `results-title ${won ? 'win' : 'lose'}`;
     const how = result.ko ? (result.tko ? 'T.K.O.' : 'KNOCKOUT') : 'JUDGES\' DECISION';
@@ -614,7 +655,8 @@ export class UI {
       for (const u of summary.unlocked) rw += `<div class="unlock">NEW OPPONENT UNLOCKED: ${u}</div>`;
       if (tournament && tournament.done) rw += `<div class="unlock">TOURNAMENT CHAMPION! +$${tournament.prize.cash} · +${tournament.prize.rep} REP</div>`;
       if (tournament && tournament.eliminated) rw += '<div class="unlock" style="color:var(--red)">ELIMINATED FROM THE TOURNAMENT</div>';
-    } else rw += '<div><span>Training session</span><span>—</span></div>';
+    } else if (crucible) rw += `<div><span>${CRUCIBLE.name}</span><span>EXHIBITION</span></div><div><span>Fought as</span><span>${crucible.title}</span></div><div><span>Crucible kills</span><span>${this.prog.data.crucibleWins || 0}</span></div><div class="dim" style="font-size:12px">No purse here: Kronari don't fight for money.</div>`;
+    else rw += '<div><span>Training session</span><span>—</span></div>';
     $('r-rewards').innerHTML = rw;
 
     const actions = $('r-actions');
@@ -629,7 +671,11 @@ export class UI {
       });
       actions.appendChild(b);
     };
-    if (tournament && !tournament.done && !tournament.eliminated) {
+    if (crucible) {
+      btn('REMATCH', () => this.h.onRematch(), true);
+      btn('THE CRUCIBLE', () => this.h.onResultsGo('crucible'));
+      btn('MENU', () => this.h.onResultsGo('menu'));
+    } else if (tournament && !tournament.done && !tournament.eliminated) {
       btn('NEXT FIGHT', () => this.h.onTournamentNext(), true);
       btn('UPGRADES', () => this.h.onResultsGo('upgrades'));
       btn('MENU', () => this.h.onResultsGo('menu'));

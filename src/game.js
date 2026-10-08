@@ -2,7 +2,7 @@
 // and turns combat events into feedback: sound, particles, hit-stop, slow motion, camera,
 // crowd and HUD. Fight flow: intro → fight ⇄ knockdown → ko/decision → results.
 import * as THREE from 'three';
-import { SIM, FIGHT, FIGHTER, OPPONENTS, TRAINING_DUMMY, TOURNAMENT } from './config.js';
+import { SIM, FIGHT, FIGHTER, OPPONENTS, TRAINING_DUMMY, TOURNAMENT, CRUCIBLE } from './config.js';
 import { ATTACKS } from './attacks.js';
 import { Fighter, emptyIntent } from './fighter.js';
 import { Combat } from './combat.js';
@@ -11,7 +11,7 @@ import { Arena } from './arena.js';
 import { Effects } from './effects.js';
 import { CameraRig } from './camera.js';
 import { FighterModel } from './fighterModel.js';
-import { playerStats, opponentStats } from './upgrades.js';
+import { playerStats, opponentStats, kronariStats } from './upgrades.js';
 import { TAUNT, GUARD } from './poses.js';
 
 const HITSTOP = [0, 0.03, 0.045, 0.065, 0.09, 0.12, 0.14];
@@ -75,6 +75,27 @@ export class Game {
     this.scene.add(this.player.model.root);
   }
 
+  /** Back from The Crucible: your own fighter, normal rules, normal lighting. */
+  _normalMode() {
+    if (this.player.crucible) this.buildPlayer();
+    this.combat.damageMult = 1;
+    this.combat.knockbackMult = 1;
+    this.effects.gore = 1;
+    this.arena.setTheme('default');
+  }
+
+  /** The Crucible: you play as the chosen Kronari warrior. */
+  _crucibleMode(warrior) {
+    if (this.player) this.player.model.dispose();
+    this.player = new Fighter({ id: 'player', name: warrior.title, title: warrior.title, look: warrior.look, accent: warrior.accent, isPlayer: true, style: warrior.fightStyle, stats: kronariStats(warrior) });
+    this.player.crucible = true;
+    this.scene.add(this.player.model.root);
+    this.combat.damageMult = CRUCIBLE.damageMult;
+    this.combat.knockbackMult = CRUCIBLE.knockbackMult;
+    this.effects.gore = CRUCIBLE.goreScale;
+    this.arena.setTheme('crucible');
+  }
+
   refreshPlayerStats() {
     this.player.stats = { ...this.player.stats, ...playerStats(this.prog.data) };
     this.player.name = this.player.title = this.prog.data.name;
@@ -100,6 +121,7 @@ export class Game {
     this.rig.endCinematic();
     this.rig.mode = 'menu';
     this.timers = [];
+    this._normalMode();
     this.refreshPlayerStats();
     this.player.reset();
     this.menuHome = new THREE.Vector3(-0.9, 0, 0.4);
@@ -144,12 +166,20 @@ export class Game {
   // Fight setup
 
   /** mode: 'fight' | 'tournament' | 'training' */
-  startFight(profile, mode = 'fight', tournament = null) {
+  startFight(profile, mode = 'fight', tournament = null, warrior = null) {
     this.timers = [];
     this.input.endFrame(); // drop presses left over from the menus
-    this.refreshPlayerStats();
+    const crucible = mode === 'crucible';
+    if (crucible) this._crucibleMode(warrior);
+    else {
+      this._normalMode();
+      this.refreshPlayerStats();
+    }
     const p = this.player;
     const o = this._makeOpponent(profile);
+    if (crucible) o.stats = { ...o.stats, ...kronariStats(profile) };
+    // super strength: hits send Kronari skidding across the cage
+    p.slide = o.slide = crucible ? 2.6 : 0;
     p.reset();
     o.reset();
     p.pos.set(0, 0, -3);
@@ -162,11 +192,11 @@ export class Game {
     this.ai = new AIController(profile, mode === 'training' ? 'easy' : profile.difficulty);
     if (mode === 'training') this.ai.mode = 'idle';
     this.combat.trainingInfinite = mode === 'training';
-    this.combat.damageMult = 1;
+    if (!crucible) this.combat.damageMult = 1;
     this.effects.clearBlood();
     this.match = {
-      mode, profile, tournament,
-      timeLeft: FIGHT.duration, elapsed: 0,
+      mode, profile, tournament, warrior,
+      timeLeft: crucible ? Infinity : FIGHT.duration, elapsed: 0,
       over: false, result: null, lastHitReal: 0,
       count: 0, countTimer: 0, getUpAt: 0, downed: null,
       specialWarned: 0, trainingRegen: 0,
@@ -190,7 +220,7 @@ export class Game {
     // Intro: sweeping camera, VS banner, then FIGHT!
     this.state = 'intro';
     this.rig.cinematic('intro', { angle0: 0.6 }, 3.0);
-    this.ui.vsBanner(this.prog.data.name, profile, tournament);
+    this.ui.vsBanner(crucible ? warrior.title : this.prog.data.name, profile, tournament, crucible);
     this.input.enabled = true;
     this.after(3.0, () => this._fightCall());
   }
@@ -224,9 +254,9 @@ export class Game {
 
   restart() {
     if (!this.match) return;
-    const { profile, mode, tournament } = this.match;
+    const { profile, mode, tournament, warrior } = this.match;
     this.state = 'menu';
-    this.startFight(profile, mode, tournament);
+    this.startFight(profile, mode, tournament, warrior);
   }
 
   quitFight() {
@@ -372,9 +402,9 @@ export class Game {
     o.update(dt, oi, p, this.events);
     this.combat.resolve(p, o, this.events);
 
-    if (this.state === 'fight' && m.mode !== 'training') {
+    if (this.state === 'fight' || this.state === 'knockdown') m.elapsed += dt;
+    if (this.state === 'fight' && m.mode !== 'training' && m.mode !== 'crucible') {
       m.timeLeft -= dt;
-      m.elapsed += dt;
       if (m.timeLeft <= 0) {
         m.timeLeft = 0;
         if (FIGHT.deathMatch) this._suddenDeath();
@@ -572,7 +602,12 @@ export class Game {
     au.play(a.sound, { vol: Math.min(1.3, 0.55 + lvl * 0.12), rate: 0.9 + Math.random() * 0.2, pan: pan(ev.point), reverb: 0.15 + lvl * 0.06 });
     if (lvl >= 4) au.play('impactHuge', { vol: 0.6 + (lvl - 4) * 0.25, reverb: 0.5 });
     fx.impact(ev.point, lvl, color, dir, { blood: true });
-    ev.defender.model.setBlood(1 - Math.max(0, ev.defender.health) / ev.defender.stats.maxHealth);
+    ev.defender.model.setBlood(Math.min(1, (1 - Math.max(0, ev.defender.health) / ev.defender.stats.maxHealth) * (this.effects.gore > 1 ? 2.5 : 1)));
+    if (this.effects.gore > 1 && fx.bloodOn) {
+      // The Crucible: every real hit opens something up
+      if (lvl >= 3) fx.bloodSpray(ev.point, lvl, dir);
+      if (lvl >= 3) fx.lensSplatter(lvl >= 5 ? 3 : lvl >= 4 ? 2 : 1);
+    }
     fx.hitstop(HITSTOP[lvl]);
     fx.damageNumber(ev.point, ev.damage, `${ev.counter ? 'counter' : ''} ${lvl >= 4 ? 'big' : ''} ${ev.defender === p ? 'taken' : ''}`);
     this.rig.addTrauma(0.06 + lvl * 0.075 + (ev.counter ? 0.1 : 0));
@@ -728,11 +763,16 @@ export class Game {
     const lethal = FIGHT.deathMatch && m.mode !== 'training';
     if (lethal) {
       loser.model.setBlood(1);
+      if (fx.gore > 1) {
+        const hd = this._v.set(loser.pos.x - winner.pos.x, 0, loser.pos.z - winner.pos.z).normalize().clone();
+        for (let i = 0; i < 3; i++) fx.bloodSpray(new THREE.Vector3(loser.pos.x, loser.model.height * (0.5 + i * 0.2), loser.pos.z), 6, hd);
+        fx.lensSplatter(5);
+      }
       fx.bloodSpray(this._v.set(loser.pos.x, loser.model.height * 0.85, loser.pos.z).clone(), 6, this._v.set(loser.pos.x - winner.pos.x, 0, loser.pos.z - winner.pos.z).normalize().clone());
     }
     this.after(0.7, () => {
       // the body falls backwards: head ends up behind the feet
-      if (lethal) fx.bloodPool(loser.pos.x - Math.sin(loser.facing) * 1.3, loser.pos.z - Math.cos(loser.facing) * 1.3, 1.5);
+      if (lethal) fx.bloodPool(loser.pos.x - Math.sin(loser.facing) * 1.3, loser.pos.z - Math.cos(loser.facing) * 1.3, fx.gore > 1 ? 2.6 : 1.5);
       fx.dustBurst(loser.pos.x, loser.pos.z, 30, 1.2);
       this.arena.cameraFlashes();
       this.audio.crowdReact('roar', 1.4);
@@ -805,7 +845,12 @@ export class Game {
     const perfect = r.won && this.opp.stat.damage < 0.5;
     let summary = null;
     let tourney = null;
-    if (m.mode !== 'training') {
+    if (m.mode === 'crucible') {
+      if (r.won) {
+        this.prog.data.crucibleWins = (this.prog.data.crucibleWins || 0) + 1;
+        this.prog.save();
+      }
+    } else if (m.mode !== 'training') {
       summary = this.prog.award({ opponent: m.profile, won: r.won, ko: r.ko, tko: r.tko, perfect, stats, tournament: !!m.tournament });
       if (m.tournament) {
         tourney = m.tournament;
@@ -820,7 +865,7 @@ export class Game {
     }
     this.state = 'results';
     this.ui.hideHud();
-    this.ui.showResults({ result: r, stats, summary, profile: m.profile, tournament: tourney, perfect });
+    this.ui.showResults({ result: r, stats, summary, profile: m.profile, tournament: tourney, perfect, crucible: m.mode === 'crucible' ? m.warrior : null });
   }
 }
 

@@ -557,6 +557,28 @@ export class Arena {
     this.flashT = 0;
   }
 
+  /** 'default' or 'crucible' (furnace-red lighting, heavier haze) */
+  setTheme(name) {
+    if (!this._themeBase) {
+      this._themeBase = {
+        fog: this.scene.fog.color.getHex(), density: this.scene.fog.density,
+        main: this.mainLight.color.getHex(), c0: this.colorLights[0].color.getHex(), c1: this.colorLights[1].color.getHex(),
+        n0: this.neonMats[0].color.getHex(), n1: this.neonMats[1].color.getHex(), bg: this.scene.background.getHex(),
+      };
+    }
+    const b = this._themeBase;
+    const cru = name === 'crucible';
+    this.scene.fog.color.setHex(cru ? 0x1c0604 : b.fog);
+    this.scene.fog.density = cru ? 0.04 : b.density;
+    this.scene.background.setHex(cru ? 0x120302 : b.bg);
+    this.mainLight.color.setHex(cru ? 0xffb37a : b.main);
+    this.colorLights[0].color.setHex(cru ? 0xff3300 : b.c0);
+    this.colorLights[1].color.setHex(cru ? 0xff7a00 : b.c1);
+    this.neonMats[0].color.setHex(cru ? 0xff4400 : b.n0);
+    this.neonMats[1].color.setHex(cru ? 0xff9900 : b.n1);
+    this.theme = name;
+  }
+
   /** Burst of phone flashes from the crowd */
   cameraFlashes() {
     const pos = this.phoneFlash.geometry.attributes.position.array;

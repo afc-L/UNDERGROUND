@@ -416,7 +416,7 @@ export class Fighter {
     this.moveVel.z += (wantZ - this.moveVel.z) * acc;
     this.pos.x += (this.moveVel.x + this.vel.x) * dt;
     this.pos.z += (this.moveVel.z + this.vel.z) * dt;
-    const damp = Math.exp(-(this.isDown ? 5 : 7) * dt);
+    const damp = Math.exp(-(this.slide || (this.isDown ? 5 : 7)) * dt);
     this.vel.multiplyScalar(damp);
 
     // Stamina regen
@@ -694,6 +694,7 @@ export class Fighter {
     }
 
     approachPose(this.pose, T, 1 - Math.exp(-rate * dt));
+    this.model.capeLift = Math.hypot(this.moveVel.x, this.moveVel.z) * 0.12 + Math.hypot(this.vel.x, this.vel.z) * 0.08;
     if (this.state === 'thrown') {
       // flipped over the thrower: lifted along the arc and rotated head-first
       const u = Math.min(1, this.stateTime / 0.75);
