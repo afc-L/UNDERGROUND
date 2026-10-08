@@ -368,11 +368,11 @@ export class Game {
     const live = this.state === 'fight' || this.state === 'knockdown';
     const pi = live ? (this.autopilot ? this.autopilot.update(dt, p, o, this.events) : this._playerIntent()) : this.noIntent;
     if (this.state === 'knockdown' && !p.isDown) {
-      // between knockdown and restart the standing fighter can only reposition
-      pi.light = pi.heavy = pi.special = pi.dodge = false;
+      // while the opponent is down: move in and stomp / kick them (no special)
+      pi.special = false;
     }
     if (m.mode === 'training') this._trainingKeys();
-    const oi = this.state === 'fight' ? this.ai.update(dt, o, p, this.events) : this.noIntent;
+    const oi = this.state === 'fight' || this.state === 'knockdown' ? this.ai.update(dt, o, p, this.events) : this.noIntent;
 
     p.update(dt, pi, o, this.events);
     o.update(dt, oi, p, this.events);
@@ -577,7 +577,8 @@ export class Game {
       this.ui.notify(`${ev.counter}!`, ev.attacker === p ? 'good' : 'bad');
       au.play('parry', { vol: 0.35 });
     }
-    if (ev.stagger) this.ui.notify(ev.defender === p ? 'STAGGERED' : 'HE\'S HURT!', ev.defender === p ? 'bad' : 'good');
+    if (ev.ground && ev.attacker === p && ev.combo === 1) this.ui.notify(a.name, 'small');
+    if (ev.stagger) this.ui.notify(ev.defender === p ? 'STAGGERED' : 'THEY\'RE HURT!', ev.defender === p ? 'bad' : 'good');
 
     // crowd
     const exc = 0.04 + lvl * 0.05 + (ev.counter ? 0.1 : 0) + (ev.combo >= 5 ? 0.1 : 0);
@@ -605,7 +606,7 @@ export class Game {
     fx.speedLines(1);
     this.rig.addTrauma(0.7);
     this.rig.punch(8);
-    this.rig.cinematic('knockdown', { a: down, b: up }, 0);
+    this.rig.cinematic('knockdown', { a: down, b: up }, 1.6); // then back to the fight camera so the standing fighter can move in
     this.audio.play('impactHuge', { vol: 1, reverb: 0.6 });
     this.audio.play('slowmo', { vol: 0.6 });
     this.audio.crowdReact('roar', 1.1);
@@ -623,7 +624,10 @@ export class Game {
     if (down === this.player) m.getUpAt = 3 + down.knockdowns;
     else m.getUpAt = Math.round(Math.min(8, 2 + down.knockdowns + (1 - hp) * 3 + Math.random()));
     m.getUpAt = Math.max(2, Math.round(m.getUpAt / down.stats.recovery));
-    if (down === this.player) this.ui.hint('MASH ATTACK TO GET UP FASTER!', true);
+    if (down === this.player) this.ui.hint('MASH J / K TO GET UP FASTER!', true);
+    else if (m.mode !== 'training') this.after(1.2, () => {
+      if (this.state === 'knockdown' && m.downed && m.downed.state === 'down') this.ui.notify('THEY\'RE DOWN: J STOMP · K KICK', 'small warn', 1.8);
+    });
   }
 
   _knockdownUpdate(dt, realDt) {

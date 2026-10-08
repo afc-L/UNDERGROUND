@@ -316,6 +316,83 @@ check((await st()).p.atk === 'special', 'special can be re-used once the meter r
 await step(80);
 for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
 
+console.log('— Health & ground attacks');
+check(await ev(() => window.__underground.game.player.stats.maxHealth) >= 180, `player health scaled up (${await ev(() => window.__underground.game.player.stats.maxHealth)})`);
+check(await ev(() => window.__underground.game.opp.stats.maxHealth) >= 150, `opponent health scaled up (${await ev(() => window.__underground.game.opp.stats.maxHealth)})`);
+// knock the opponent down and keep them down
+const downOpp = () => ev(() => {
+  const g = window.__underground.game;
+  const o = g.opp;
+  o.knockDown();
+  g._beginKnockdown(o, g.player, false);
+  g.match.getUpAt = 99;
+  o.facing = Math.PI;
+  o.stateTime = 1;
+  o.state = 'down';
+  g.effects.clearTime();
+});
+await faceOff(2);
+await downOpp();
+await step(30);
+// stand next to the body (the torso lies behind the feet)
+await ev(() => {
+  const g = window.__underground.game;
+  const gp = g.opp.groundPoint();
+  g.player.pos.set(gp.x + 0.9, 0, gp.z);
+  g.player.facing = -Math.PI / 2;
+  g.player.setState('idle');
+});
+await recordEvents();
+let hpDown = (await st()).o.hp;
+await press('KeyJ');
+await step(3);
+check((await st()).p.atk === 'stomp', 'J next to a downed opponent is a STOMP');
+await step(30);
+check((await st()).o.hp < hpDown, `stomp hurts the downed opponent (${(hpDown - (await st()).o.hp).toFixed(1)})`);
+hpDown = (await st()).o.hp;
+await press('KeyK');
+await step(3);
+check((await st()).p.atk === 'soccerKick', 'K next to a downed opponent is a GROUND KICK');
+await step(40);
+check((await st()).o.hp < hpDown, 'ground kick hurts the downed opponent');
+check((await st()).o.state === 'down', 'they stay down while being kicked');
+await ev(() => {
+  window.__underground.game.opp.health = 2;
+});
+await press('KeyK');
+await step(40);
+check((await st()).state === 'ko', 'a ground kick can be the killing blow');
+await step(30, 1 / 30);
+await shot('06b-ground-kill');
+// fresh fight for the AI test
+await step(400, 1 / 30);
+await ev(() => {
+  const U = window.__underground;
+  U.handlers.onResultsGo('menu');
+  U.ui.show(null);
+  U.game.startFight(U.OPPONENTS[0], 'fight');
+  U.game.skipIntro();
+});
+await faceOff(2);
+await ev(() => {
+  const g = window.__underground.game;
+  const p = g.player;
+  g.ai.mode = 'fight';
+  g.ai.p.aggression = 1;
+  p.knockDown();
+  g._beginKnockdown(p, g.opp, false);
+  g.match.getUpAt = 99;
+});
+await recordEvents();
+await step(360);
+evs = await events();
+check(evs.some((e) => e.type === 'hit' && (e.attack === 'stomp' || e.attack === 'soccerKick') && e.who !== 'player'), 'the AI walks over and kicks a downed player');
+await ev(() => {
+  const g = window.__underground.game;
+  g.match.getUpAt = 0;
+});
+for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
+
 console.log('— Blood & death-match rules');
 await faceOff(1.1);
 await recordEvents();
@@ -383,7 +460,7 @@ const statsText = await page.textContent('#r-stats');
 check(/Accuracy/.test(statsText) && /Max combo/.test(statsText) && /Knockdowns/.test(statsText), 'fight statistics shown');
 const prog = await ev(() => window.__underground.prog.data);
 check(prog.cash > cash0, `cash earned ($${cash0} → $${prog.cash})`);
-check(prog.rep > 0 && prog.record.w === 1 && prog.record.ko === 1, `reputation and record updated (rep ${prog.rep}, ${prog.record.w}W ${prog.record.ko}KO)`);
+check(prog.rep > 0 && prog.record.w >= 1 && prog.record.ko >= 1, `reputation and record updated (rep ${prog.rep}, ${prog.record.w}W ${prog.record.ko}KO)`);
 check(await ev(() => window.__underground.prog.isUnlocked(window.__underground.OPPONENTS[1])), 'beating the Rookie unlocks the Brawler');
 await shot('10-results');
 
@@ -420,7 +497,7 @@ await step(60);
 check((await st()).state === 'ko', 'player can be knocked out');
 await step(320, 1 / 30);
 check(await page.isVisible('#screen-results.active') && /YOU DIED/.test(await page.textContent('#r-title')), 'YOU DIED screen shown');
-check(await ev(() => window.__underground.prog.data.record.l) === 1, 'loss recorded');
+check(await ev(() => window.__underground.prog.data.record.l) >= 1, 'loss recorded');
 await page.click('#r-actions button:has-text("MENU")');
 
 console.log('— Pause');

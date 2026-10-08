@@ -43,6 +43,10 @@ export class Combat {
     const t = att.attackTime * att.attackRate;
     if (t < atk.startup || t > atk.startup + atk.active) return;
 
+    if (atk.ground) {
+      this._groundHit(att, def, atk, events);
+      return;
+    }
     const dist = Math.hypot(def.pos.x - att.pos.x, def.pos.z - att.pos.z);
     const reach = atk.range + FIGHTER.radius * 0.6;
     if (dist > reach) return;
@@ -175,12 +179,56 @@ export class Combat {
     events.push(ev);
   }
 
+  /** Stomps and kicks on a downed fighter: no blocking, no dodging, no getting up mid-hit. */
+  _groundHit(att, def, atk, events) {
+    if (!def.groundTarget) return;
+    const gp = def.groundPoint();
+    const dx = gp.x - att.pos.x;
+    const dz = gp.z - att.pos.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > atk.range + 0.25) return;
+    let ang = Math.atan2(dx, dz) - att.facing;
+    while (ang > Math.PI) ang -= Math.PI * 2;
+    while (ang < -Math.PI) ang += Math.PI * 2;
+    if (Math.abs(ang) > (atk.arc * Math.PI) / 360 + 0.2) return;
+
+    att.attackHit = true;
+    const mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue / def.stats.defense;
+    const damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
+    const combo = att.comboTimer > 0 ? att.combo + 1 : 1;
+    att.combo = combo;
+    att.comboTimer = FIGHT.comboTimeout;
+    att.stat.maxCombo = Math.max(att.stat.maxCombo, combo);
+    att.stat.landed++;
+    att.stat.damage += Math.min(damage, def.health);
+    att.stat.groundHits = (att.stat.groundHits || 0) + 1;
+    att.addMeter(METER.hit * atk.meter);
+    def.health -= damage;
+    if (this.trainingInfinite && def.health < 1) def.health = 1;
+    def.model.flash = 0.7;
+    const nx = dist > 1e-4 ? dx / dist : 0;
+    const nz = dist > 1e-4 ? dz / dist : 0;
+    def.vel.set(nx * atk.knockback, 0, nz * atk.knockback);
+    def.mash = Math.max(0, def.mash - 2); // getting kicked makes it harder to get up
+    const point = new THREE.Vector3(gp.x, 0.28, gp.z);
+    const ev = { type: 'hit', attacker: att, defender: def, attack: atk, damage, counter: null, combo, point, impact: atk.impact, ground: true };
+    if (def.health <= 0) {
+      def.health = 0;
+      def.knockOut();
+      ev.ko = true;
+      att.stat.knockdowns++;
+    }
+    events.push(ev);
+  }
+
   _separate(a, b, events) {
     const dx = b.pos.x - a.pos.x;
     const dz = b.pos.z - a.pos.z;
     const d = Math.hypot(dx, dz);
     const min = FIGHTER.radius * 2;
-    if (d < min && !(a.isDown && b.isDown)) {
+    // no body collision with someone lying on the mat: you can step over (and onto) them
+    const lying = (f) => f.state === 'knockdown' || f.state === 'down' || f.state === 'ko';
+    if (d < min && !lying(a) && !lying(b)) {
       const nx = d > 1e-4 ? dx / d : 1;
       const nz = d > 1e-4 ? dz / d : 0;
       const push = (min - d) / 2;

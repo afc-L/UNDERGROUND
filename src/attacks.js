@@ -94,6 +94,25 @@ export const ATTACKS = {
     windup: { pelvisY: -0.1, pelvis: [0, 0.3, 0], spine: [0.1, 0.2, 0], rHip: [-0.5, 0.4, -0.4], rKn: 1.6 },
     strike: { pelvis: [0, 0.75, 0], spine: [-0.38, -0.3, 0.2], head: [0.1, -0.4, 0], rHip: [0, 1.3, -1.6], rKn: 0.05, lKn: 0.3, rSh: [-0.3, 0, -0.8], rEl: -0.9, lSh: [-0.6, 0, 0.5] },
   }),
+  // Ground attacks: only used on a downed opponent (pressing J / K next to them)
+  stomp: A({
+    id: 'stomp', name: 'STOMP', ground: true, limb: 'kick', height: 'low', side: 1,
+    startup: 0.17, active: 0.08, recovery: 0.3,
+    damage: 6, stamina: 9, range: 1.1, arc: 80, lunge: 1.2,
+    knockback: 0.6, impact: 2, balance: 0, meter: 0.8, sound: 'kick',
+    next: { light: 'stomp', heavy: 'soccerKick' },
+    windup: { spine: [0.15, 0, 0], rHip: [-1.3, 0.2, -0.1], rKn: 1.9, lKn: 0.25, lSh: [-0.6, 0, 0.6], lEl: -1.2, rSh: [-0.5, 0, -0.6], rEl: -1.2 },
+    strike: { spine: [0.4, 0, 0], head: [0.45, 0, 0], pelvisY: -0.06, rHip: [-0.55, 0.1, -0.05], rKn: 0.15, lKn: 0.35, lSh: [-0.5, 0, 0.7], lEl: -1.0, rSh: [-0.4, 0, -0.7], rEl: -1.0 },
+  }),
+  soccerKick: A({
+    id: 'soccerKick', name: 'GROUND KICK', kind: 'heavy', ground: true, limb: 'kick', height: 'low', side: 1,
+    startup: 0.27, active: 0.08, recovery: 0.4,
+    damage: 11, stamina: 15, range: 1.2, arc: 80, lunge: 1.6,
+    knockback: 2.5, impact: 3, balance: 0, meter: 1.2, sound: 'kick',
+    next: { light: 'stomp' },
+    windup: { spine: [-0.05, -0.2, 0], rHip: [0.7, 0, -0.1], rKn: 1.3, lKn: 0.3, lSh: [-0.9, 0, 0.4], rSh: [0.3, 0, -0.3] },
+    strike: { spine: [0.3, 0.2, 0], head: [0.35, 0, 0], rHip: [-1.0, 0, -0.05], rKn: 0.1, lKn: 0.35, lSh: [0.3, 0, 0.4], rSh: [-0.9, 0, -0.3], rEl: -0.8 },
+  }),
   special: A({
     id: 'special', name: 'UNDERGROUND BREAKER', kind: 'special', side: 1,
     startup: 0.55, active: 0.12, recovery: 0.6,

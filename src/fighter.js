@@ -109,6 +109,18 @@ export class Fighter {
   get forward() {
     return { x: Math.sin(this.facing), z: Math.cos(this.facing) };
   }
+  /** Lying on the mat and kickable (a short moment after hitting the floor). */
+  get groundTarget() {
+    return this.state === 'down' || (this.state === 'knockdown' && this.stateTime > 0.3);
+  }
+
+  /** Where a downed fighter's torso is: the body falls backwards, away from where they faced. */
+  groundPoint(out = { x: 0, z: 0 }) {
+    out.x = this.pos.x - Math.sin(this.facing) * 0.8;
+    out.z = this.pos.z - Math.cos(this.facing) * 0.8;
+    return out;
+  }
+
   get specialReady() {
     return this.special >= FIGHTER.specialMax && this.specialCooldown <= 0;
   }
@@ -234,12 +246,16 @@ export class Fighter {
         this.attackTime += dt;
         const t = this.attackTime * rate;
         // Track the opponent during startup (aim assist) so attacks don't whiff from small drift.
-        if (opp && t < a.startup && distOpp < 4.5) this.faceToward(opp.pos.x, opp.pos.z, dt, a.kind === 'special' ? 20 : 9);
+        const gp = a.ground && opp ? opp.groundPoint() : null;
+        const aimX = gp ? gp.x : opp && opp.pos.x;
+        const aimZ = gp ? gp.z : opp && opp.pos.z;
+        const aimDist = gp ? Math.hypot(gp.x - this.pos.x, gp.z - this.pos.z) : distOpp;
+        if (opp && t < a.startup && aimDist < 4.5) this.faceToward(aimX, aimZ, dt, a.kind === 'special' ? 20 : 9);
         faceOpp = false;
         // Lunge forward
         if (a.lunge > 0 && t > a.startup * a.lungeStart && t < a.startup + a.active) {
-          const stopDist = FIGHTER.radius * 2 + 0.25;
-          if (!opp || distOpp > stopDist) {
+          const stopDist = gp ? 0.85 : FIGHTER.radius * 2 + 0.25;
+          if (!opp || aimDist > stopDist) {
             const f = this.forward;
             const sp = a.lunge * rate;
             this.pos.x += f.x * sp * dt;
@@ -364,6 +380,11 @@ export class Fighter {
     this.bufferTime = 0.28;
   }
 
+  _groundDist(opp) {
+    const gp = opp.groundPoint();
+    return Math.hypot(gp.x - this.pos.x, gp.z - this.pos.z);
+  }
+
   _canDodge() {
     return this.dodgeCooldown <= 0 && this.stamina >= 6;
   }
@@ -378,10 +399,15 @@ export class Fighter {
       if (this.buffer === 'special') {
         if (this.specialReady) atk = ATTACKS.special;
         else events.push({ type: 'specialNotReady', fighter: this });
+      } else if (opp && opp.groundTarget && this._groundDist(opp) < 2.2) {
+        atk = this.buffer === 'heavy' ? ATTACKS.soccerKick : ATTACKS.stomp;
       } else atk = chainAttack(null, this.buffer);
       this.buffer = null;
       if (atk) {
-        if (opp && !opp.isDown) this.faceToward(opp.pos.x, opp.pos.z, 1, 1.2);
+        if (atk.ground) {
+          const gp = opp.groundPoint();
+          this.faceToward(gp.x, gp.z, 1, 1.5);
+        } else if (opp && !opp.isDown) this.faceToward(opp.pos.x, opp.pos.z, 1, 1.2);
         this.startAttack(atk, events);
         return true;
       }

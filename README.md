@@ -48,8 +48,8 @@ example, point GitHub Pages at it, or run `npm start` and open http://localhost:
 | --- | --- |
 | `W` `A` `S` `D` | Move (relative to the camera) |
 | Mouse | Camera. Click the game to capture the mouse. Mouse buttons don't attack. |
-| `J` | Light attack. Chain up to 4: jab → cross → hook → uppercut. |
-| `K` | Heavy attack / combo finisher |
+| `J` | Light attack. Chain up to 4: jab → cross → hook → uppercut. Stomp on a downed opponent. |
+| `K` | Heavy attack / combo finisher. Ground kick on a downed opponent. |
 | `Space` | Block. Tap it just before a hit for a **perfect block**. |
 | `Shift` | Dodge. Hold it to sprint. |
 | `Q` | Toggle lock-on (on by default) |
@@ -64,6 +64,10 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
 * **Combo tree.** Light presses chain jab → cross → hook → uppercut. Heavy after a jab or cross
   is a **roundhouse kick**. Heavy after a hook or uppercut is a **spinning heel kick**. Heavy
   from neutral is a slow, long-reaching **haymaker**.
+* **Ground attacks.** When your opponent is on the mat, press `J` next to them to **stomp** or
+  `K` for a **ground kick**, and chain them together. A downed fighter can't block or dodge, and
+  getting kicked slows down their get-up. The AI does the same to you, so mash `J`/`K` to get
+  up. A ground kick can be the killing blow.
 * **Counters.** A perfect block staggers the attacker. Dodging through an attack (with
   i-frames) is a **perfect dodge**. Both open a short window where your next strike is a
   **COUNTER** (×1.5 damage). Interrupting an opponent's wind-up is a **COUNTER HIT** (×1.25).
@@ -76,7 +80,9 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
 * **Special meter.** It fills from landed hits, counters, perfect blocks and perfect dodges.
   Once it's full, `E` fires a slow-motion, armored, cinematic finisher that always knocks
   down. It then needs a long recharge.
-* **Fight clock.** Each fight has 2:00 on the clock. There are no judges: when time runs out
+* **Health.** Death matches last: every fighter, including you, has 1.8× the base health
+  (you start with 180).
+* **Fight clock.** Each fight has 3:00 on the clock. There are no judges: when time runs out
   the fight goes to **SUDDEN DEATH** and every hit does 75% more damage.
 
 ## Game modes
@@ -192,7 +198,8 @@ NODE_PATH=$(npm root -g) npm run check      # needs Playwright installed globall
 `tools/smoke-test.js` drives the real game in headless Chromium with real keyboard and mouse
 input. It covers the menus, the opponent select screen, movement and sprint, the light chain,
 heavies and kicks, blocking, perfect blocks, perfect dodges, counters, the special, knockdown
-and recovery, blood and the death-match rules (no T.K.O., sudden death, the Blood setting),
+and recovery, blood and the death-match rules (no T.K.O., sudden death, the Blood setting), scaled health,
+stomps and ground kicks (including the AI kicking a downed player and a ground-kick kill),
 the killing blow and results, rewards and unlocks, upgrades, defeat, pause, training,
 the tournament, and the fighter and settings screens. It also runs an AI-vs-AI soak against
 every opponent and checks that every AI state gets used. Screenshots go to

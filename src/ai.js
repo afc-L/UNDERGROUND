@@ -105,6 +105,50 @@ export class AIController {
       return I;
     }
 
+    // ---- Opponent on the ground: walk over and stomp / kick them (or let them get up) ----
+    if (opp.state === 'knockdown' || opp.state === 'down') {
+      I.block = false;
+      if (this.groundKd !== opp.knockdowns) {
+        this.groundKd = opp.knockdowns;
+        this.groundMode = chance(0.3 + p.aggression * 0.65 + (d.reads ? 0.1 : 0));
+        this.groundKicks = 1 + ((Math.random() * (d.comboLength + 1)) | 0);
+        this.groundT = rand(0.25, 0.6);
+      }
+      if (!me.canAct) return I;
+      const gp = opp.groundPoint();
+      // stand beside the torso (on whichever side we're already on), not on top of it
+      const bx = -Math.cos(opp.facing);
+      const bz = Math.sin(opp.facing);
+      const side = (me.pos.x - gp.x) * bx + (me.pos.z - gp.z) * bz >= 0 ? 1 : -1;
+      const tx = gp.x + bx * side * 0.6;
+      const tz = gp.z + bz * side * 0.6;
+      const gx = tx - me.pos.x;
+      const gz = tz - me.pos.z;
+      const gd = Math.hypot(gx, gz) || 0.001;
+      if (!this.groundMode || this.groundKicks <= 0) {
+        // stand off and wait for them to get up
+        if (dist < 2.6) {
+          I.moveX = -nx * 0.7;
+          I.moveZ = -nz * 0.7;
+        }
+        return I;
+      }
+      if (gd > 0.3) {
+        I.moveX = gx / gd;
+        I.moveZ = gz / gd;
+        return I;
+      }
+      this.groundT -= dt;
+      if (this.groundT <= 0 && opp.groundTarget) {
+        if (chance(p.heavyPref + 0.25)) I.heavy = true;
+        else I.light = true;
+        this.groundKicks--;
+        this.groundT = rand(0.45, 0.85);
+        this.visited.add('GROUND');
+      }
+      return I;
+    }
+
     // ---- Reactive defense against a new incoming attack ----
     if (opp.state === 'attack' && opp.attackSerial !== this.lastSerial) {
       this.lastSerial = opp.attackSerial;
