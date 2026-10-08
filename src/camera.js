@@ -182,7 +182,7 @@ export class CameraRig {
 
     this.pos.lerp(this.wantPos, posK);
     this.look.lerp(this.wantLook, lookK);
-    // never put the lens inside a body (fighters, referee)
+    // never put the lens inside a fighter's body
     if (ctx.bodies && this.pos.y < 2.4) {
       for (const b of ctx.bodies) {
         if (!b) continue;

@@ -296,14 +296,47 @@ check(s.state === 'knockdown', 'special causes a knockdown');
 check(await ev(() => window.__underground.game.player.special) < 20, 'special consumes the meter');
 await step(40);
 await shot('07-knockdown');
-let sawCount = false;
-for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) {
-  await step(15);
-  if (((await page.textContent('#count')) || '').trim()) sawCount = true;
-}
-check(sawCount, 'referee count shows on screen');
+check(await ev(() => !('referee' in window.__underground.game)), 'there is no referee');
+for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
 check((await st()).state === 'fight', 'opponent recovers and the fight resumes');
 check(await ev(() => window.__underground.game.opp.knockdowns) === 1, 'knockdown is recorded');
+const wear = await ev(() => {
+  const o = window.__underground.game.opp;
+  return { power: o.wearPower, speed: o.wearSpeed };
+});
+check(wear.power < 1 && wear.speed < 1, `a knockdown leaves them weaker and slower (power ${Math.round(wear.power * 100)}%, speed ${Math.round(wear.speed * 100)}%)`);
+const dmgTest = await ev(() => {
+  const g = window.__underground.game;
+  const o = g.opp;
+  const p = g.player;
+  const run = (kd) => {
+    o.knockdowns = kd;
+    o.setState('idle');
+    o.pos.set(0, 0, 0);
+    o.facing = 0;
+    o.counterTimer = 0;
+    o.combo = 0;
+    o.comboTimer = 0;
+    o.stamina = o.stats.maxStamina;
+    p.setState('idle');
+    p.pos.set(0, 0, 1.1);
+    p.health = p.stats.maxHealth;
+    p.invuln = 0;
+    o.startAttack(window.__underground.ATTACKS.cross, []);
+    o.attackTime = (o.attack.startup + o.attack.active * 0.5) / o.attackRate;
+    const evs = [];
+    g.combat.resolve(o, p, evs);
+    const hit = evs.find((e) => e.type === 'hit');
+    o.setState('idle');
+    return hit ? hit.damage : 0;
+  };
+  const d0 = run(0);
+  const d2 = run(2);
+  o.knockdowns = 1;
+  return { d0, d2 };
+});
+check(dmgTest.d2 < dmgTest.d0 * 0.8, `twice-knocked-down fighter hits softer (${dmgTest.d0.toFixed(1)} → ${dmgTest.d2.toFixed(1)})`);
+check(await ev(() => window.__underground.game.match.timeLeft > 240), 'fights run on a 5:00 clock');
 await ev(() => {
   const p = window.__underground.game.player;
   p.special = 100;

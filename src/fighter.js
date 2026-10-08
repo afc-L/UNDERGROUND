@@ -2,7 +2,7 @@
 // A Fighter is driven only by an "intent" object each frame (see input.js / ai.js), so a
 // networked opponent could be driven by remote intents with no changes here.
 import * as THREE from 'three';
-import { FIGHTER, ARENA } from './config.js';
+import { FIGHTER, ARENA, FIGHT } from './config.js';
 import { ATTACKS, chainAttack } from './attacks.js';
 import { FighterModel } from './fighterModel.js';
 import {
@@ -100,6 +100,17 @@ export class Fighter {
     const f = this.stamina / (this.stats.maxStamina * FIGHTER.lowStamina);
     return f >= 1 ? 1 : 0.7 + 0.3 * f;
   }
+  /** Knockdowns taken this fight (capped): each one leaves the fighter weaker and slower. */
+  get wear() {
+    return Math.min(FIGHT.knockdownWear.max, this.knockdowns);
+  }
+  get wearPower() {
+    return 1 - FIGHT.knockdownWear.power * this.wear;
+  }
+  get wearSpeed() {
+    return 1 - FIGHT.knockdownWear.speed * this.wear;
+  }
+
   get canAct() {
     return this.state === 'idle' || this.state === 'block';
   }
@@ -174,7 +185,7 @@ export class Fighter {
     this.attackResolved = false;
     this.attackSerial++;
     this.attackCounter = this.counterTimer > 0;
-    this.attackRate = this.stats.attackSpeed * (this.attackExhausted ? 0.75 : 1) * (0.85 + 0.15 * this.fatigue);
+    this.attackRate = this.stats.attackSpeed * (this.attackExhausted ? 0.75 : 1) * (0.85 + 0.15 * this.fatigue) * (1 - FIGHT.knockdownWear.attackSpeed * this.wear);
     this.stat.thrown++;
     if (atk.kind === 'special') {
       this.special = 0;
@@ -291,7 +302,7 @@ export class Fighter {
       }
       case 'dodge': {
         const k = 1 - this.stateTime / FIGHTER.dodgeTime;
-        const sp = FIGHTER.dodgeSpeed * Math.max(0, k) * (0.9 + 0.1 * s.speed);
+        const sp = FIGHTER.dodgeSpeed * Math.max(0, k) * (0.9 + 0.1 * s.speed) * this.wearSpeed;
         this.pos.x += this.dodgeDir.x * sp * dt;
         this.pos.z += this.dodgeDir.z * sp * dt;
         if (this.stateTime >= FIGHTER.dodgeTime) {
@@ -336,7 +347,7 @@ export class Fighter {
           this.sprinting = true;
           this.useStaminaSoft(FIGHTER.sprintCost * dt);
         }
-        speed *= moveScale * (0.75 + 0.25 * this.fatigue);
+        speed *= moveScale * (0.75 + 0.25 * this.fatigue) * this.wearSpeed;
         wantX = (intent.moveX / Math.max(mag, 1e-6)) * mag * speed;
         wantZ = (intent.moveZ / Math.max(mag, 1e-6)) * mag * speed;
         if (!faceOpp || this.sprinting) {
@@ -359,7 +370,7 @@ export class Fighter {
 
     // Stamina regen
     if (this.staminaDelay <= 0 && !this.sprinting) {
-      let r = FIGHTER.staminaRegen * s.regen;
+      let r = FIGHTER.staminaRegen * s.regen * (1 - FIGHT.knockdownWear.regen * this.wear);
       if (this.state === 'block') r *= 0.35;
       else if (this.isDown) r *= 1.6;
       this.stamina = Math.min(s.maxStamina, this.stamina + r * dt);
@@ -480,11 +491,14 @@ export class Fighter {
         T.set(this.inFight || this.state === 'idle' ? GUARD : RELAXED);
         if (this.state === 'intro') T.set(this.introPose || GUARD);
         // breathing + bounce
-        const bob = Math.sin(time * (this.inFight ? 7 : 2.2)) * (this.inFight ? 0.022 : 0.012);
-        T[IDX.pelvisY] += bob - (this.exhausted ? 0.05 : 0);
-        T[IDX.spine] += Math.sin(time * 2.2) * 0.02 + (this.exhausted ? 0.18 : 0);
-        T[IDX.lSh] += Math.sin(time * 3.1) * 0.05 + (this.exhausted ? 0.35 : 0);
-        T[IDX.rSh] += Math.sin(time * 3.1 + 1) * 0.05 + (this.exhausted ? 0.3 : 0);
+        const w = this.inFight ? this.wear : 0; // knockdown damage: heavier bounce, dropping guard
+        const bob = Math.sin(time * (this.inFight ? 7 - w * 1.4 : 2.2)) * (this.inFight ? 0.022 + w * 0.01 : 0.012);
+        T[IDX.pelvisY] += bob - (this.exhausted ? 0.05 : 0) - w * 0.025;
+        T[IDX.spine] += Math.sin(time * 2.2) * 0.02 + (this.exhausted ? 0.18 : 0) + w * 0.06;
+        T[IDX.spine + 2] += Math.sin(time * 1.3) * 0.04 * w;
+        T[IDX.head] += w * 0.08;
+        T[IDX.lSh] += Math.sin(time * 3.1) * 0.05 + (this.exhausted ? 0.35 : 0) + w * 0.12;
+        T[IDX.rSh] += Math.sin(time * 3.1 + 1) * 0.05 + (this.exhausted ? 0.3 : 0) + w * 0.1;
         this._walkCycle(T, speed, dt);
         rate = 11;
         break;

@@ -103,7 +103,7 @@ export class Combat {
     }
 
     // ---- Clean hit ----
-    let mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue / def.stats.defense;
+    let mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue * att.wearPower / def.stats.defense;
     let counter = null;
     if (att.attackCounter) {
       counter = 'COUNTER';
@@ -193,7 +193,7 @@ export class Combat {
     if (Math.abs(ang) > (atk.arc * Math.PI) / 360 + 0.2) return;
 
     att.attackHit = true;
-    const mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue / def.stats.defense;
+    const mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue * att.wearPower / def.stats.defense;
     const damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
     const combo = att.comboTimer > 0 ? att.combo + 1 : 1;
     att.combo = combo;

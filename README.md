@@ -74,15 +74,18 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
 * **Stamina.** Attacking, blocking hits, dodging, sprinting and the special all cost stamina.
   Below 25% you get slower and weaker. Blocking with an empty tank causes a **GUARD BREAK**.
 * **Balance and knockdowns.** Every clean hit chips at a hidden balance meter. Break it with a
-  heavy hit, or land the special, for a **knockdown**. The referee counts and the downed
-  fighter recovers. If you're the one down, mash attack to get up faster. There's no T.K.O.:
-  the fight only ends when someone's health hits zero.
+  heavy hit, or land the special, for a **knockdown**. There's no referee: the downed fighter
+  gets up after a few seconds, and if you're the one down, mash attack to get up faster. There's
+  no T.K.O. either. Instead, **every knockdown wears a fighter down** for the rest of the fight:
+  −12% damage, −10% movement and dodge speed, −8% attack speed and −15% stamina recovery per
+  knockdown, stacking up to three. You can see it in how they move: their guard drops and they
+  bounce slower. The HUD marks show how many times each fighter has been dropped.
 * **Special meter.** It fills from landed hits, counters, perfect blocks and perfect dodges.
   Once it's full, `E` fires a slow-motion, armored, cinematic finisher that always knocks
   down. It then needs a long recharge.
 * **Health.** Death matches last: every fighter, including you, has 1.8× the base health
   (you start with 180).
-* **Fight clock.** Each fight has 3:00 on the clock. There are no judges: when time runs out
+* **Fight clock.** Each fight has 5:00 on the clock. There are no judges: when time runs out
   the fight goes to **SUDDEN DEATH** and every hit does 75% more damage.
 
 ## Game modes
@@ -130,11 +133,10 @@ sweat spray, a bigger impact flash sprite and shockwave ring, a hotter impact li
 **hit-stop**, stronger trauma-based camera shake and FOV punch, louder layered impact audio and
 a bigger crowd reaction. Counters and long combos (5+) bump the level up. The biggest hits play
 a short cinematic: hit → slow motion → shake → impact flash and speed lines → reaction → normal
-speed. Knockdowns switch to a low-angle orbit camera with slow motion, a dust burst, a crowd
-roar and the referee's count. Knockouts add a slow cinematic orbit, a triple bell, phone camera
+speed. Knockdowns switch to a low-angle orbit camera with slow motion, a dust burst and a crowd
+roar. Knockouts add a slow cinematic orbit, a triple bell, phone camera
 flashes in the crowd, a final burst of blood and a spreading pool, a **FINISHED** (or **YOU
-DIED**) slam, the winner's celebration with the referee signalling
-the winner, and a full stats and rewards screen.
+DIED**) slam, the winner's celebration, and a full stats and rewards screen.
 
 ## Project structure
 
@@ -155,7 +157,6 @@ src/
   effects.js          pooled particles, flashes, rings, impact light, hit-stop/slow-mo, screen FX
   audio.js            synthesized sound bank, crowd, music sequencer (sample-replaceable)
   arena.js            venue: cage, lights, neon, instanced crowd, entrance, waiting area, fog
-  referee.js          referee positioning, count and knockout gestures
   ui.js               menus, opponent select, tournament, upgrades, fighter editor, HUD, results
   progression.js      save data, rewards, XP/levels, unlocks
   upgrades.js         upgrade definitions and stat calculation

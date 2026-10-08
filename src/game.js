@@ -10,7 +10,6 @@ import { AIController } from './ai.js';
 import { Arena } from './arena.js';
 import { Effects } from './effects.js';
 import { CameraRig } from './camera.js';
-import { Referee } from './referee.js';
 import { FighterModel } from './fighterModel.js';
 import { playerStats, opponentStats } from './upgrades.js';
 import { TAUNT, GUARD } from './poses.js';
@@ -30,7 +29,6 @@ export class Game {
     this.arena = new Arena(scene, progression.data.settings.quality);
     this.effects = new Effects(scene, camera, dom);
     this.rig = new CameraRig(camera);
-    this.referee = new Referee(scene);
     this.combat = new Combat();
     this.events = [];
     this.timers = [];
@@ -112,8 +110,6 @@ export class Game {
       this.opp.model.dispose();
       this.opp = null;
     }
-    this.referee.setMode('watch');
-    this.referee.pos.set(3.5, 0, -3);
     this.exciteBase = 0.18;
     this.audio.setMusic('menu');
   }
@@ -174,8 +170,6 @@ export class Game {
       count: 0, countTimer: 0, getUpAt: 0, downed: null,
       specialWarned: 0, trainingRegen: 0,
     };
-    this.referee.setMode('start');
-    this.referee.pos.set(2.5, 0, 0);
     this.effects.clearTime();
     this.rig.mode = 'fight';
     this.rig.orbitOffset = 0;
@@ -222,7 +216,6 @@ export class Game {
     this.player.inFight = this.opp.inFight = true;
     this.player.setState('idle');
     this.opp.setState('idle');
-    this.referee.setMode('watch');
     this.input.enabled = true;
     this.audio.setMusic('fight');
     this.ui.showHud(this.match);
@@ -282,7 +275,6 @@ export class Game {
     if (!paused) {
       this.player.animate(dt, this.time);
       if (this.opp) this.opp.animate(dt, this.time);
-      this.referee.update(dt, this.player, this.opp || this.player);
       this.excite += (this.exciteBase - this.excite) * Math.min(1, realDt * 0.6);
       this.arena.update(realDt, Math.min(1, this.excite));
       this.arena.shaft.visible = this.state === 'menu' && this.prog.data.settings.quality === 'high';
@@ -292,7 +284,7 @@ export class Game {
     }
     this.rig.update(paused ? 0 : realDt, {
       player: this.player, opp: this.opp, locked: this.lockPref && !!this.opp && !this.opp.isDown,
-      bodies: this.state === 'menu' ? null : [this.player.pos, this.opp && this.opp.pos, this.referee.pos],
+      bodies: this.state === 'menu' ? null : [this.player.pos, this.opp && this.opp.pos],
     });
     if (this.match && this.state !== 'menu') this.ui.updateHud(this);
   }
@@ -440,7 +432,8 @@ export class Game {
       p.health = Math.min(p.stats.maxHealth, p.health + dt * 60);
     }
     if (p.health < 2) p.health = p.stats.maxHealth * 0.5;
-    o.knockdowns = 0;
+    if (p.state !== 'knockdown' && p.state !== 'down') p.knockdowns = 0; // no lasting wear in training
+    if (o.state !== 'knockdown' && o.state !== 'down') o.knockdowns = 0;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -463,13 +456,7 @@ export class Game {
           au.play('specialCharge', { vol: 1 });
           fx.slowmo(0.35, 0.55);
           const def = ev.attacker === p ? this.opp : p;
-          // shoot from the side of the fighters' axis away from the referee
-          const ax = def.pos.x - ev.attacker.pos.x;
-          const az = def.pos.z - ev.attacker.pos.z;
-          const rx = this.referee.pos.x - ev.attacker.pos.x;
-          const rz = this.referee.pos.z - ev.attacker.pos.z;
-          const refSide = -az * rx + ax * rz >= 0 ? 1 : -1;
-          this.rig.cinematic('special', { a: ev.attacker, b: def, side: -refSide }, 0.85);
+          this.rig.cinematic('special', { a: ev.attacker, b: def, side: Math.random() < 0.5 ? 1 : -1 }, 0.85);
           fx.speedLines(0.8);
           this.ui.notify(ev.attacker === p ? 'UNDERGROUND BREAKER!' : `${ev.attacker.title}: SPECIAL!`, 'special big');
           this.excite = Math.max(this.excite, 0.85);
@@ -613,7 +600,6 @@ export class Game {
     this.excite = 1.15;
     this.ui.bigText(tko ? 'KNOCKDOWN!' : 'KNOCKDOWN!', 'kd', 1.6);
     this.ui.comboBreak();
-    this.referee.setMode('count', { down, up });
     this.after(0.55, () => {
       this.audio.play('bodyfall', { vol: 1, reverb: 0.5 });
       fx.dustBurst(down.pos.x - Math.sin(down.facing) * 0.9, down.pos.z - Math.cos(down.facing) * 0.9, 26, 1);
@@ -638,24 +624,20 @@ export class Game {
       // back on their feet after the get-up animation: resume the fight
       this.state = 'fight';
       this.rig.endCinematic();
-      this.referee.setMode('watch');
       this.ui.notify('FIGHT!', 'small');
       this.audio.play('bell', { vol: 0.4 });
       this.excite = 0.7;
       return;
     }
     if (down.state !== 'down') return;
+    // No referee and no count: the downed fighter gets up after a few beats (mashing helps the player)
     m.countTimer += realDt;
-    // player mashing shortens the count
     let target = m.getUpAt;
     if (down === this.player) target = Math.max(2, m.getUpAt - Math.floor(down.mash / 4));
     if (m.countTimer >= FIGHT.countInterval) {
       m.countTimer = 0;
       m.count++;
-      this.ui.count(m.count);
-      this.referee.pulse();
-      this.audio.play('count', { vol: 0.8 });
-      this.audio.crowdReact('cheer', 0.25);
+      if (m.count % 2 === 0) this.audio.crowdReact('cheer', 0.25);
       if (m.tko && m.count >= 3) {
         this.ui.hideCount();
         this._beginKO(m.up, down, true);
@@ -670,6 +652,10 @@ export class Game {
         down.stamina = Math.max(down.stamina, down.stats.maxStamina * 0.65);
         down.balance = 0;
         this.audio.crowdReact('cheer', 0.6);
+        if (m.mode !== 'training') {
+          const pct = Math.round((1 - down.wearPower) * 100);
+          this.ui.notify(down === this.player ? `YOU'RE WEAKENED (-${pct}% POWER)` : `THEY'RE WEAKENED (-${pct}% POWER)`, down === this.player ? 'bad' : 'good', 1.8);
+        }
       }
     }
   }
@@ -714,7 +700,6 @@ export class Game {
     });
     this.excite = 1.3;
     this.exciteBase = 0.9;
-    this.referee.setMode('ko', { down: loser, up: winner });
     this.ui.hideCount();
     this.ui.hint('', false);
     const koText = lethal ? (loser === this.player ? 'YOU DIED' : 'FINISHED') : tko ? 'T.K.O.' : 'KNOCKOUT';
@@ -767,7 +752,6 @@ export class Game {
     winner.setState('victory');
     if (!loser.isDown) loser.setState('defeated');
     this.rig.cinematic('victory', { a: winner }, 0);
-    this.referee.setMode('winner', { winner });
     this.ui.bigText(winner === this.player ? 'VICTORY' : 'DEFEAT', winner === this.player ? 'win' : 'lose', 2.2);
     this.audio.play(winner === this.player ? 'victory' : 'defeat', { vol: 0.9 });
     this.audio.setMusic(winner === this.player ? 'menu' : 'tense');
