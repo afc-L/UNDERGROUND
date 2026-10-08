@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="description" content="UNDERGROUND - a cinematic arcade fighting game that runs in your browser." />
+<title>UNDERGROUND</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" />
+<style>
+  /* Layout: a fight-night bill. Full-bleed hero still, then a poster-style fight card, then the moves. */
+  :root {
+    color-scheme: dark;
+    --ink: #0b0a0d;        /* hall darkness */
+    --slab: #151318;       /* concrete panel */
+    --line: #2b2730;       /* hairline / chain-link grey */
+    --text: #ece6df;
+    --dim: #948d97;
+    --neon: #ff2a6d;       /* cage neon (the game's accent) */
+    --cyan: #19d3ff;
+    --gold: #f5c518;       /* purse money */
+    --green: #3dff8a;
+    --red: #ff4d4d;
+    --display: 'Anton', Impact, 'Arial Narrow Bold', sans-serif;
+    --body: 'Archivo', 'Segoe UI', Roboto, Arial, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--ink); }
+  body { background: var(--ink); color: var(--text); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+  a { color: inherit; }
+  img { max-width: 100%; display: block; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding-inline: max(16px, 4vw); }
+  h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; text-wrap: balance; margin: 0; line-height: 0.95; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+  /* ---------- top bar ---------- */
+  .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: color-mix(in srgb, var(--ink) 82%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar .wrap { display: flex; align-items: center; gap: 24px; padding-block: 12px; }
+  .mark { font-family: var(--display); font-size: 22px; letter-spacing: 0.06em; text-decoration: none; color: var(--text); text-shadow: 0 0 14px color-mix(in srgb, var(--neon) 60%, transparent); }
+  .bar nav { display: flex; gap: 20px; margin-left: auto; font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .bar nav a { text-decoration: none; color: var(--dim); }
+  .bar nav a:hover { color: var(--text); }
+  .bar nav a.play-link { color: var(--neon); }
+
+  /* ---------- buttons ---------- */
+  .btn { display: inline-flex; align-items: center; gap: 12px; font-family: var(--display); font-size: 26px; letter-spacing: 0.06em; text-decoration: none; padding: 14px 30px; background: var(--neon); color: #fff; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); transition: transform 0.15s, filter 0.15s; }
+  .btn:hover { transform: translateY(-2px); filter: brightness(1.12); }
+  .btn.ghost { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--line); font-size: 20px; padding: 12px 22px; }
+  .btn .arrow { font-family: var(--mono); font-size: 18px; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 40%; filter: saturate(1.1) contrast(1.05); }
+  .hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, var(--ink) 8%, color-mix(in srgb, var(--ink) 75%, transparent) 45%, color-mix(in srgb, var(--ink) 15%, transparent) 100%), linear-gradient(0deg, var(--ink) 0%, transparent 35%); }
+  .hero .wrap { position: relative; z-index: 1; padding-block: clamp(64px, 12vw, 150px) clamp(48px, 8vw, 96px); }
+  .hero h1 { font-size: clamp(64px, 14vw, 176px); text-shadow: 0 0 28px color-mix(in srgb, var(--neon) 70%, transparent), 0 0 80px color-mix(in srgb, var(--neon) 30%, transparent); margin: 10px 0 14px; }
+  .hero .tag { font-family: var(--display); font-size: clamp(20px, 3vw, 30px); color: var(--gold); letter-spacing: 0.08em; }
+  .hero p.lede { max-width: 33em; color: #cfc8c2; font-size: 18px; margin: 18px 0 30px; }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 28px; font-family: var(--mono); font-size: 12.5px; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; }
+  .facts span::before { content: '■ '; color: var(--neon); }
+
+  section { padding-block: clamp(56px, 8vw, 104px); border-bottom: 1px solid var(--line); }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 36px; }
+  .sec-head h2 { font-size: clamp(44px, 7vw, 84px); }
+  .sec-head p { max-width: 30em; color: var(--dim); margin: 0; }
+
+  /* ---------- fight card (poster bill) ---------- */
+  .bill { display: grid; gap: 0; border-top: 2px solid var(--text); }
+  .bout { display: grid; grid-template-columns: 76px minmax(0, 1.5fr) minmax(0, 1fr) 150px; gap: 20px; align-items: center; padding-block: 20px; border-bottom: 1px solid var(--line); --acc: var(--text); }
+  .bout .no { font-family: var(--mono); font-size: 12px; color: var(--dim); letter-spacing: 0.1em; line-height: 1.4; }
+  .bout .no b { display: block; font-family: var(--display); font-weight: 400; font-size: 40px; color: var(--acc); letter-spacing: 0; line-height: 1; }
+  .bout h3 { font-size: clamp(30px, 4.4vw, 52px); color: var(--acc); }
+  .bout .who { font-size: 14px; color: #cfc8c2; margin-top: 4px; }
+  .bout .style { font-family: var(--mono); font-size: 12px; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 6px; }
+  .tape { display: grid; grid-template-columns: 66px 1fr 34px; gap: 4px 10px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.08em; }
+  .tape i { display: block; height: 6px; background: color-mix(in srgb, var(--acc) 85%, transparent); }
+  .tape .track { background: var(--line); height: 6px; }
+  .tape em { font-style: normal; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+  .purse { text-align: right; }
+  .purse .amt { font-family: var(--display); font-size: 34px; color: var(--gold); line-height: 1; }
+  .purse .sub { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.06em; margin-top: 4px; }
+  .diff { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; padding: 2px 8px; border: 1px solid currentColor; margin-top: 8px; }
+  .diff.easy { color: var(--green); }
+  .diff.normal { color: var(--gold); }
+  .diff.hard { color: var(--red); }
+  .bout.main { background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 9%, transparent), transparent 70%); }
+  .bout.main .no::after { content: 'MAIN EVENT'; display: block; color: var(--gold); margin-top: 4px; }
+  .bill-note { font-family: var(--mono); font-size: 12px; color: var(--dim); margin-top: 16px; letter-spacing: 0.04em; }
+
+  /* ---------- features ---------- */
+  .feats { display: grid; gap: clamp(40px, 6vw, 72px); }
+  .feat { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(20px, 4vw, 48px); align-items: center; }
+  .feat:nth-child(even) .shot { order: 2; }
+  .shot { position: relative; border: 1px solid var(--line); background: var(--slab); }
+  .shot img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+  .shot figcaption { position: absolute; left: 10px; bottom: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; background: color-mix(in srgb, var(--ink) 80%, transparent); padding: 3px 8px; color: var(--dim); }
+  .feat h3 { font-size: clamp(32px, 4.5vw, 52px); margin-bottom: 14px; }
+  .feat h3 span { color: var(--neon); }
+  .feat p { color: #cfc8c2; margin: 0 0 12px; max-width: 34em; }
+  .seq { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; }
+  .seq span { padding: 4px 9px; border: 1px solid var(--line); color: var(--text); }
+  .seq span.hot { border-color: var(--neon); color: var(--neon); }
+  .seq .to { border: 0; padding-inline: 0; color: var(--dim); }
+
+  /* ---------- controls ---------- */
+  .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 64px); }
+  .keys { display: grid; gap: 10px; }
+  .key-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .kbd { display: flex; flex-wrap: wrap; gap: 5px; }
+  kbd { font-family: var(--mono); font-size: 13px; font-weight: 700; min-width: 32px; text-align: center; padding: 5px 8px; background: var(--slab); border: 1px solid var(--line); border-bottom-width: 3px; color: var(--text); }
+  .key-row .what { color: #cfc8c2; font-size: 15px; }
+  .tree h3 { font-size: 34px; margin-bottom: 16px; }
+  .tree ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .tree li { padding: 14px 16px; background: var(--slab); border-left: 3px solid var(--line); }
+  .tree li b { font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: 0.04em; }
+  .tree li .seq { margin-top: 8px; }
+  .tree li p { margin: 6px 0 0; font-size: 14px; color: var(--dim); }
+  .tree li.counter { border-left-color: var(--gold); }
+  .tree li.special { border-left-color: var(--neon); }
+
+  /* ---------- career strip ---------- */
+  .career { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .career figure { margin: 0; }
+  .career .shot img { aspect-ratio: 16 / 10; }
+  .career h3 { font-size: 28px; margin: 14px 0 6px; }
+  .career p { margin: 0; color: var(--dim); font-size: 15px; }
+
+  /* ---------- final call ---------- */
+  .final { text-align: left; border-bottom: 0; }
+  .final .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
+  .final h2 { font-size: clamp(48px, 8vw, 104px); }
+  .final h2 span { color: var(--neon); text-shadow: 0 0 24px color-mix(in srgb, var(--neon) 60%, transparent); }
+  .desk-note { font-family: var(--mono); font-size: 12px; color: var(--dim); margin-top: 12px; letter-spacing: 0.04em; }
+  footer { padding-block: 28px 40px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: space-between; }
+
+  @media (max-width: 860px) {
+    .bout { grid-template-columns: 56px minmax(0, 1fr); }
+    .bout .tape, .bout .purse { grid-column: 2; }
+    .purse { text-align: left; display: flex; gap: 14px; align-items: baseline; }
+    .feat, .controls { grid-template-columns: minmax(0, 1fr); }
+    .feat:nth-child(even) .shot { order: 0; }
+    .career { grid-template-columns: minmax(0, 1fr); }
+    .bar nav a:not(.play-link) { display: none; }
+    .key-row { grid-template-columns: 120px minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+</head>
+<body style="margin:0">
+<header class="bar">
+  <div class="wrap">
+    <a class="mark" href="#top">UNDERGROUND</a>
+    <nav aria-label="Sections">
+      <a href="#card">Fight card</a>
+      <a href="#fight">How it hits</a>
+      <a href="#controls">Controls</a>
+      <a class="play-link" href="play.html">Play ▸</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <img class="hero-img" src="img/hero.jpg" alt="A fighter drops to the mat under the cage lights as KNOCKOUT flashes across the screen" />
+    <div class="wrap">
+      <div class="eyebrow">A browser fighting game · fictional unsanctioned tournament</div>
+      <h1>UNDERGROUND</h1>
+      <div class="tag">Enter as nobody. Leave as a legend.</div>
+      <p class="lede">Six fighters stand between you and the title. Chain combos, slip punches, counter, and put people on the mat in a neon-lit cage. Every big hit lands with slow motion, camera shake and a roar from the crowd.</p>
+      <div class="cta">
+        <a class="btn" href="play.html">Enter the pit <span class="arrow">▸</span></a>
+        <a class="btn ghost" href="#controls">Learn the moves</a>
+      </div>
+      <div class="facts"><span>Free, runs in your browser</span><span>No account, no download</span><span>Keyboard + mouse</span><span>Progress saves locally</span></div>
+    </div>
+  </div>
+
+  <section id="card">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <div class="eyebrow">Tonight in the pit</div>
+          <h2>The Fight Card</h2>
+        </div>
+        <p>Every name is fictional. Beat each fighter and earn enough reputation to unlock the next one. Purses grow as the ladder climbs.</p>
+      </div>
+      <div class="bill">
+        <article class="bout" style="--acc: #3d8bff">
+          <div class="no">BOUT<b>1</b></div>
+          <div><h3>The Rookie</h3><div class="who">Danny “Fresh” Okafor</div><div class="style">Balanced · first night in the pit</div><span class="diff easy">EASY</span></div>
+          <div class="tape"><span>HEALTH</span><div class="track"><i style="width:50%"></i></div><em>85</em><span>POWER</span><div class="track"><i style="width:37%"></i></div><em>0.85</em><span>SPEED</span><div class="track"><i style="width:63%"></i></div><em>1.00</em><span>DEFENSE</span><div class="track"><i style="width:50%"></i></div><em>0.90</em></div>
+          <div class="purse"><div class="amt">$220</div><div class="sub">+10 REP · +60 XP</div></div>
+        </article>
+        <article class="bout" style="--acc: #d9a400">
+          <div class="no">BOUT<b>2</b></div>
+          <div><h3>The Brawler</h3><div class="who">Bruno “Anvil” Kask</div><div class="style">Slow but powerful</div><span class="diff easy">EASY</span></div>
+          <div class="tape"><span>HEALTH</span><div class="track"><i style="width:74%"></i></div><em>125</em><span>POWER</span><div class="track"><i style="width:89%"></i></div><em>1.35</em><span>SPEED</span><div class="track"><i style="width:35%"></i></div><em>0.78</em><span>DEFENSE</span><div class="track"><i style="width:44%"></i></div><em>0.85</em></div>
+          <div class="purse"><div class="amt">$380</div><div class="sub">+18 REP · +90 XP</div></div>
+        </article>
+        <article class="bout" style="--acc: #14b8a6">
+          <div class="no">BOUT<b>3</b></div>
+          <div><h3>The Technician</h3><div class="who">Ilse “Metronome” Varga</div><div class="style">Fast and defensive · counters</div><span class="diff normal">NORMAL</span></div>
+          <div class="tape"><span>HEALTH</span><div class="track"><i style="width:62%"></i></div><em>105</em><span>POWER</span><div class="track"><i style="width:47%"></i></div><em>0.95</em><span>SPEED</span><div class="track"><i style="width:85%"></i></div><em>1.18</em><span>DEFENSE</span><div class="track"><i style="width:94%"></i></div><em>1.25</em></div>
+          <div class="purse"><div class="amt">$560</div><div class="sub">+28 REP · +130 XP</div></div>
+        </article>
+        <article class="bout" style="--acc: #a78bfa">
+          <div class="no">BOUT<b>4</b></div>
+          <div><h3>The Ghost</h3><div class="who">Rui “Static” Holt</div><div class="style">Evasive counter-striker</div><span class="diff normal">NORMAL</span></div>
+          <div class="tape"><span>HEALTH</span><div class="track"><i style="width:65%"></i></div><em>110</em><span>POWER</span><div class="track"><i style="width:58%"></i></div><em>1.05</em><span>SPEED</span><div class="track"><i style="width:94%"></i></div><em>1.25</em><span>DEFENSE</span><div class="track"><i style="width:63%"></i></div><em>1.00</em></div>
+          <div class="purse"><div class="amt">$760</div><div class="sub">+40 REP · +170 XP</div></div>
+        </article>
+        <article class="bout" style="--acc: #ef4444">
+          <div class="no">BOUT<b>5</b></div>
+          <div><h3>The Beast</h3><div class="who">Volkan “Furnace” Dragan</div><div class="style">Relentless aggression</div><span class="diff hard">HARD</span></div>
+          <div class="tape"><span>HEALTH</span><div class="track"><i style="width:82%"></i></div><em>140</em><span>POWER</span><div class="track"><i style="width:74%"></i></div><em>1.20</em><span>SPEED</span><div class="track"><i style="width:73%"></i></div><em>1.08</em><span>DEFENSE</span><div class="track"><i style="width:50%"></i></div><em>0.90</em></div>
+          <div class="purse"><div class="amt">$1,050</div><div class="sub">+60 REP · +230 XP</div></div>
+        </article>
+        <article class="bout main" style="--acc: #f5c518">
+          <div class="no">BOUT<b>6</b></div>
+          <div><h3>The Champion</h3><div class="who">Aurelio “The Crown” Sandoval</div><div class="style">Complete fighter · adapts to you</div><span class="diff hard">HARD</span></div>
+          <div class="tape"><span>HEALTH</span><div class="track"><i style="width:94%"></i></div><em>160</em><span>POWER</span><div class="track"><i style="width:79%"></i></div><em>1.25</em><span>SPEED</span><div class="track"><i style="width:81%"></i></div><em>1.15</em><span>DEFENSE</span><div class="track"><i style="width:88%"></i></div><em>1.20</em></div>
+          <div class="purse"><div class="amt">$1,600</div><div class="sub">+100 REP · +340 XP</div></div>
+        </article>
+      </div>
+      <p class="bill-note">Purses are for a win. A knockout pays 25% more, your first win over a fighter pays 50% more, and combos and counters earn a style bonus. Your fighter starts with 100 health.</p>
+    </div>
+  </section>
+
+  <section id="fight">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <div class="eyebrow">Combat</div>
+          <h2>How it hits</h2>
+        </div>
+        <p>Fast, readable, arcade combat. The harder the hit, the louder everything gets. No blood, no injuries: impacts show as sparks, flashes and shockwaves.</p>
+      </div>
+      <div class="feats">
+        <div class="feat">
+          <figure class="shot"><img src="img/special.jpg" alt="The player launches the Underground Breaker special in slow motion, with pink energy around them" loading="lazy" /><figcaption>UNDERGROUND BREAKER</figcaption></figure>
+          <div>
+            <h3>Impact you can <span>feel</span></h3>
+            <p>Every strike has an impact level from 1 to 6. Higher levels add more hit sparks, a longer hit-stop, harder camera shake, heavier sound and a bigger crowd reaction.</p>
+            <p>The biggest hits play a short cinematic, then hand control straight back to you.</p>
+            <div class="seq"><span>HIT</span><span class="to">→</span><span>SLOW MOTION</span><span class="to">→</span><span>SHAKE</span><span class="to">→</span><span>IMPACT</span><span class="to">→</span><span>REACTION</span><span class="to">→</span><span class="hot">NORMAL SPEED</span></div>
+          </div>
+        </div>
+        <div class="feat">
+          <figure class="shot"><img src="img/knockdown.jpg" alt="KNOCKDOWN! in gold letters as a fighter falls, shot from a low angle" loading="lazy" /><figcaption>KNOCKDOWN</figcaption></figure>
+          <div>
+            <h3>Knockdowns and <span>the count</span></h3>
+            <p>Clean hits wear down a fighter's balance. Break it with a heavy shot and they hit the mat. The camera drops low, the crowd roars and the referee starts counting.</p>
+            <p>If you're the one on the floor, mash attack to get up sooner. Three knockdowns is a T.K.O. Zero health is a knockout.</p>
+          </div>
+        </div>
+        <div class="feat">
+          <figure class="shot"><img src="img/combo.jpg" alt="A 4 HIT COMBO counter on screen as the player presses the Rookie" loading="lazy" /><figcaption>4 HIT COMBO</figcaption></figure>
+          <div>
+            <h3>An opponent that <span>reads you</span></h3>
+            <p>Each opponent blocks, dodges, counters and manages stamina at its own difficulty level. On hard, the AI watches your habits.</p>
+            <p>If you turtle, it goes after your guard with heavies. If you swing wildly, it sits back and counters. If you dodge a lot, it switches to safe jabs. If you're hurt, it presses harder.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="controls">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <div class="eyebrow">Before you step in</div>
+          <h2>Controls</h2>
+        </div>
+        <p>Click inside the game to capture the mouse. Lock-on is on by default, so movement circles your opponent.</p>
+      </div>
+      <div class="controls">
+        <div class="keys">
+          <div class="key-row"><div class="kbd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div class="what">Move, relative to the camera</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Mouse</kbd></div><div class="what">Camera</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Left click</kbd></div><div class="what">Light attack, chain up to 4</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Right click</kbd></div><div class="what">Heavy attack or combo finisher</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Space</kbd></div><div class="what">Block. Tap it just before a hit to parry.</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Shift</kbd></div><div class="what">Dodge. Hold it to sprint.</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Q</kbd></div><div class="what">Toggle lock-on</div></div>
+          <div class="key-row"><div class="kbd"><kbd>E</kbd></div><div class="what">Special attack, when the meter is full</div></div>
+          <div class="key-row"><div class="kbd"><kbd>Esc</kbd></div><div class="what">Pause</div></div>
+        </div>
+        <div class="tree">
+          <h3>The combo tree</h3>
+          <ol>
+            <li><b>Light string</b><div class="seq"><span>JAB</span><span class="to">→</span><span>CROSS</span><span class="to">→</span><span>HOOK</span><span class="to">→</span><span class="hot">UPPERCUT</span></div></li>
+            <li><b>Kicks</b><div class="seq"><span>JAB / CROSS</span><span class="to">+ RMB →</span><span class="hot">ROUNDHOUSE</span></div><div class="seq"><span>HOOK / UPPERCUT</span><span class="to">+ RMB →</span><span class="hot">SPINNING HEEL KICK</span></div></li>
+            <li class="counter"><b>Counters</b><p>A perfect block or a dodge through an attack opens a short window. Your next strike lands as a COUNTER for 1.5× damage.</p></li>
+            <li class="special"><b>Underground Breaker</b><p>The meter fills from hits, counters, parries and perfect dodges. The special can't be interrupted and always knocks down, then takes a long time to recharge.</p></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="career">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <div class="eyebrow">Between fights</div>
+          <h2>Build a career</h2>
+        </div>
+        <p>Win purses and reputation, level up, and spend your cash where it hurts.</p>
+      </div>
+      <div class="career">
+        <figure><div class="shot"><img src="img/results.jpg" alt="Victory screen with fight stats and a breakdown of rewards" loading="lazy" /></div><h3>Purses &amp; stats</h3><p>After every fight you see accuracy, damage, max combo, counters and knockdowns, along with what you earned.</p></figure>
+        <figure><div class="shot"><img src="img/select.jpg" alt="Opponent select screen with locked and unlocked fighter cards" loading="lazy" /></div><h3>Six upgrades</h3><p>Conditioning, Cardio, Power, Footwork, Recovery and Killer Instinct, five levels each.</p></figure>
+        <figure><div class="shot"><img src="img/fighter.jpg" alt="Fighter editor with skin, hair, top, shorts and glove options" loading="lazy" /></div><h3>Your fighter</h3><p>Pick a name, look and build. Then run the six-fight Pit Invitational for the title and the grand prize.</p></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div>
+        <h2>Nobody knows<br />your name. <span>Yet.</span></h2>
+        <p class="desk-note">Best on a desktop or laptop with a keyboard and mouse. Turn your sound on.</p>
+      </div>
+      <a class="btn" href="play.html">Enter the pit <span class="arrow">▸</span></a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>UNDERGROUND · built with Three.js · all characters are fictional</span>
+    <span>Source: <a href="https://github.com/afc-L/UNDERGROUND">github.com/afc-L/UNDERGROUND</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

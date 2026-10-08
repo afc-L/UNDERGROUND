@@ -31,3 +31,7 @@ html = html
 const out = path.join(dist, 'underground.html');
 fs.writeFileSync(out, html);
 console.log(`Built ${path.relative(root, out)} (${(fs.statSync(out).size / 1024).toFixed(0)} KB)`);
+
+// The website (site/) serves the same standalone build as its playable page.
+fs.copyFileSync(out, path.join(root, 'site/play.html'));
+console.log('Copied it to site/play.html');

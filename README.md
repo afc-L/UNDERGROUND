@@ -34,6 +34,13 @@ npm install          # installs esbuild (dev only)
 npm run build        # writes dist/underground.html
 ```
 
+## Website
+
+`site/` holds the game's website: a landing page (`site/index.html`) with the fight card,
+combat guide and controls, plus the playable game (`site/play.html`, copied from the standalone
+build by `npm run build`). It's static, so any static host can serve the folder as-is. For
+example, point GitHub Pages at it, or run `npm start` and open http://localhost:8080/site/.
+
 ## Controls
 
 | Input | Action |
