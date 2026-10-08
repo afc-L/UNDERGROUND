@@ -420,6 +420,7 @@ export class UI {
       ${slider('shake', 'CAMERA SHAKE', 0, 1.5, 0.05)}
       <div class="set-row"><span>INVERT MOUSE Y</span><input type="checkbox" data-c="invertY" ${s.invertY ? 'checked' : ''} /></div>
       <div class="set-row"><span>BLOOD</span><input type="checkbox" data-c="blood" ${s.blood !== false ? 'checked' : ''} /></div>
+      <div class="set-row"><span>EXTREME GORE (DISMEMBERMENT, BROKEN BONES)</span><input type="checkbox" data-c="gore" ${s.gore !== false ? 'checked' : ''} /></div>
       <div class="set-row"><span>DAMAGE NUMBERS</span><input type="checkbox" data-c="damageNumbers" ${s.damageNumbers ? 'checked' : ''} /></div>
       <div class="set-row"><span>GRAPHICS QUALITY</span><select data-q="quality"><option value="high" ${s.quality === 'high' ? 'selected' : ''}>HIGH</option><option value="low" ${s.quality === 'low' ? 'selected' : ''}>LOW (FASTER)</option></select></div>
       <div class="set-row"><span>RESET CAREER</span><button class="btn danger" id="reset-btn">RESET PROGRESS</button></div>
@@ -646,7 +647,9 @@ export class UI {
       ${row('Counters', stats.counters)}
       ${row('Perfect blocks', stats.perfectBlocks)}
       ${row('Perfect dodges', stats.perfectDodges)}
-      ${row('Specials used', stats.specials)}`;
+      ${row('Specials used', stats.specials)}
+      ${row('Bones broken', stats.bonesBroken || 0)}
+      ${stats.fatal ? row('Fatal blows', stats.fatal) : ''}`;
     let rw = '<h4>REWARDS</h4>';
     if (summary) {
       rw += summary.lines.map(([k, v]) => row(k, `$${v}`)).join('');

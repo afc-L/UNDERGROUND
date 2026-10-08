@@ -256,6 +256,19 @@ export class AudioEngine {
       tone(ctx, out, t, { type: 'triangle', f: 660, dur: 0.15, gain: 0.25 });
       tone(ctx, out, t + 0.09, { type: 'triangle', f: 990, dur: 0.3, gain: 0.25 });
     });
+    this.register('boneCrack', (ctx, out, t) => {
+      // sharp dry snap with a short splinter tail
+      noise(ctx, out, t, { type: 'highpass', f: 2500, dur: 0.025, gain: 1.0 });
+      noise(ctx, out, t + 0.012, { type: 'bandpass', f: 1400, q: 4, dur: 0.06, gain: 0.8 });
+      noise(ctx, out, t + 0.03, { type: 'bandpass', f: 900, q: 6, dur: 0.05, gain: 0.5 });
+      tone(ctx, out, t, { type: 'square', f: 260, f2: 90, dur: 0.06, gain: 0.25 });
+    });
+    this.register('tear', (ctx, out, t) => {
+      // wet tearing rip
+      noise(ctx, out, t, { type: 'bandpass', f: 400, f2: 1600, q: 1.2, a: 0.02, dur: 0.35, gain: 0.9 });
+      noise(ctx, out, t + 0.05, { f: 600, f2: 150, dur: 0.4, gain: 0.7 });
+      tone(ctx, out, t, { f: 90, f2: 40, dur: 0.3, gain: 0.6 });
+    });
     this.register('uiClick', (ctx, out, t) => {
       tone(ctx, out, t, { type: 'square', f: 900, f2: 500, dur: 0.035, gain: 0.12 });
     });

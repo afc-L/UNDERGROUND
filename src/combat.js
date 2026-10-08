@@ -29,6 +29,9 @@ export class Combat {
     this.trainingInfinite = false;
     this.damageMult = 1; // e.g. sudden death, The Crucible
     this.knockbackMult = 1; // The Crucible: super strength sends people flying
+    this.goreOn = true; // broken bones (and dismemberment, handled by the game)
+    this.breakMult = 1; // tuning / tests
+    this.fatalMult = 1;
   }
 
   /** Resolve both fighters' attacks against each other, then separate bodies. */
@@ -136,7 +139,7 @@ export class Combat {
     }
 
     // ---- Clean hit ----
-    let mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue * att.wearPower / def.stats.defense;
+    let mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue * att.wearPower * att.limbMult(atk) / def.stats.defense;
     let counter = null;
     if (att.attackCounter) {
       counter = 'COUNTER';
@@ -148,7 +151,9 @@ export class Combat {
     // Combo scaling keeps long strings strong but not instant-kill
     const combo = att.comboTimer > 0 ? att.combo + 1 : 1;
     if (combo > 4) mult *= Math.max(0.6, 1 - (combo - 4) * 0.06);
-    const damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
+    let damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
+    const fatal = this._rollFatal(atk, def);
+    if (fatal) damage = def.health + 1;
 
     att.combo = combo;
     att.comboTimer = FIGHT.comboTimeout;
@@ -172,7 +177,8 @@ export class Combat {
     // attacker recoil on big hits
     if (atk.impact >= 3) att.vel.set(-dirX * 0.8, 0, -dirZ * 0.8);
 
-    const ev = { type: 'hit', attacker: att, defender: def, attack: atk, damage, counter, combo, point, impact: atk.impact + (counter ? 1 : 0) };
+    const ev = { type: 'hit', attacker: att, defender: def, attack: atk, damage, counter, combo, point, impact: atk.impact + (counter ? 1 : 0), fatal };
+    if (fatal) att.stat.fatal++;
 
     if (def.health <= 0) {
       def.health = 0;
@@ -191,6 +197,7 @@ export class Combat {
       return;
     }
 
+    this._rollBreak(att, atk, def, ev);
     if (atk.effect === 'liver') {
       def.useStamina(35);
       ev.liver = true;
@@ -222,13 +229,46 @@ export class Combat {
     events.push(ev);
   }
 
+  /**
+   * Low-chance FATAL BLOW: a big hit that kills outright, whatever the health bar says.
+   * More likely the more hurt the victim already is. Never in training.
+   */
+  _rollFatal(atk, def) {
+    if (this.trainingInfinite) return false;
+    const base = atk.slam ? 0.05 : atk.kind === 'special' ? 0.04 : atk.ground ? 0.02 : atk.style || atk.kind === 'heavy' ? 0.012 : 0;
+    if (!base) return false;
+    const hurt = 1 - Math.max(0, def.health) / def.stats.maxHealth;
+    return Math.random() < base * (1 + 2 * hurt) * this.fatalMult;
+  }
+
+  /** Big hits can snap a limb (once each): arms hang and hit half as hard, broken legs limp. */
+  _rollBreak(att, atk, def, ev) {
+    if (!this.goreOn || this.trainingInfinite || !atk) return;
+    let chance = atk.kind === 'special' ? 0.3 : atk.ground ? 0.08 : atk.impact >= 4 || atk.style ? 0.12 : atk.kind === 'heavy' ? 0.05 : 0;
+    chance *= this.breakMult * (this.knockbackMult > 1 ? 1.5 : 1);
+    if (!chance || Math.random() >= chance) return;
+    const lower = atk.limb === 'kick' || atk.height === 'mid' || atk.ground;
+    const options = lower ? ['lLeg', 'rLeg', 'lArm', 'rArm'] : ['lArm', 'rArm', 'lArm', 'rArm', 'lLeg', 'rLeg'];
+    const free = options.filter((k) => !def.broken[k]);
+    if (!free.length) return;
+    const limb = free[(Math.random() * free.length) | 0];
+    def.broken[limb] = true;
+    att.stat.bonesBroken++;
+    ev.broke = limb;
+  }
+
   /** The suplex lands: the thrown fighter is slammed into the mat behind the thrower. */
   slam(att, def, events) {
     if (def.state !== 'thrown') return;
     const atk = att.specialAtk && att.specialAtk.throw ? att.specialAtk : null;
     const base = atk ? atk.damage : 30;
     const mult = att.stats.power * att.fatigue * att.wearPower / def.stats.defense;
-    const damage = Math.max(1, base * mult * FIGHT.damageScale * this.damageMult);
+    let damage = Math.max(1, base * mult * FIGHT.damageScale * this.damageMult);
+    const fatal = this._rollFatal({ kind: 'special', slam: true }, def);
+    if (fatal) {
+      damage = def.health + 1;
+      att.stat.fatal++;
+    }
     att.stat.damage += Math.min(damage, def.health);
     att.addMeter(METER.counter);
     def.addMeter(METER.takenHit);
@@ -237,7 +277,8 @@ export class Combat {
     def.model.flash = 1;
     def.facing = att.facing;
     const point = new THREE.Vector3(def.pos.x, 0.35, def.pos.z);
-    const ev = { type: 'hit', attacker: att, defender: def, attack: atk || { id: 'slam', name: 'SLAM', kind: 'special', sound: 'punchHeavy', impact: 5 }, damage, counter: null, combo: 1, point, impact: 5, slam: true };
+    const ev = { type: 'hit', attacker: att, defender: def, attack: atk || { id: 'slam', name: 'SLAM', kind: 'special', sound: 'punchHeavy', impact: 5 }, damage, counter: null, combo: 1, point, impact: 5, slam: true, fatal };
+    if (def.health > 0) this._rollBreak(att, ev.attack, def, ev);
     if (def.health <= 0) {
       def.health = 0;
       def.knockOut();
@@ -266,8 +307,13 @@ export class Combat {
     if (Math.abs(ang) > (atk.arc * Math.PI) / 360 + 0.2) return;
 
     att.attackHit = true;
-    const mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue * att.wearPower / def.stats.defense;
-    const damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
+    const mult = att.stats.power * (att.attackExhausted ? 0.75 : 1) * att.fatigue * att.wearPower * att.limbMult(atk) / def.stats.defense;
+    let damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
+    const fatal = this._rollFatal(atk, def);
+    if (fatal) {
+      damage = def.health + 1;
+      att.stat.fatal++;
+    }
     const combo = att.comboTimer > 0 ? att.combo + 1 : 1;
     att.combo = combo;
     att.comboTimer = FIGHT.comboTimeout;
@@ -284,7 +330,8 @@ export class Combat {
     def.vel.set(nx * atk.knockback * this.knockbackMult, 0, nz * atk.knockback * this.knockbackMult);
     def.mash = Math.max(0, def.mash - 2); // getting kicked makes it harder to get up
     const point = new THREE.Vector3(gp.x, 0.28, gp.z);
-    const ev = { type: 'hit', attacker: att, defender: def, attack: atk, damage, counter: null, combo, point, impact: atk.impact, ground: true };
+    const ev = { type: 'hit', attacker: att, defender: def, attack: atk, damage, counter: null, combo, point, impact: atk.impact, ground: true, fatal };
+    if (def.health > 0) this._rollBreak(att, atk, def, ev);
     if (def.health <= 0) {
       def.health = 0;
       def.knockOut();

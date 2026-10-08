@@ -274,6 +274,7 @@ export const DEFAULT_SETTINGS = {
   quality: 'high', // 'high' | 'low'
   damageNumbers: true,
   blood: true,
+  gore: true, // dismemberment and broken bones
 };
 
 // ---------------------------------------------------------------------------------------------

@@ -57,6 +57,8 @@ export class Game {
     this.rig.shakeScale = s.shake;
     this.effects.showNumbers = s.damageNumbers;
     this.effects.bloodOn = s.blood !== false;
+    this.goreOn = s.gore !== false; // dismemberment + broken bones
+    this.combat.goreOn = this.goreOn;
     FighterModel.bloodEnabled = s.blood !== false;
     if (!this.effects.bloodOn) this.effects.clearBlood();
     for (const f of [this.player, this.opp]) if (f) f.model.setBlood(f.inFight ? 1 - f.health / f.stats.maxHealth : 0);
@@ -121,6 +123,7 @@ export class Game {
     this.rig.endCinematic();
     this.rig.mode = 'menu';
     this.timers = [];
+    this.effects.clearDebris();
     this._normalMode();
     this.refreshPlayerStats();
     this.player.reset();
@@ -194,6 +197,7 @@ export class Game {
     this.combat.trainingInfinite = mode === 'training';
     if (!crucible) this.combat.damageMult = 1;
     this.effects.clearBlood();
+    this.effects.clearDebris();
     this.match = {
       mode, profile, tournament, warrior,
       timeLeft: crucible ? Infinity : FIGHT.duration, elapsed: 0,
@@ -645,7 +649,12 @@ export class Game {
     this.excite = Math.min(1.2, this.excite + exc);
     if (lvl >= 3 || ev.combo === 5 || ev.combo === 10) au.crowdReact(lvl >= 4 ? 'roar' : 'cheer', 0.3 + lvl * 0.12);
 
-    if (ev.ko) this._beginKO(ev.attacker, ev.defender, false);
+    if (ev.broke) this._boneBreak(ev);
+    if (ev.ko) {
+      this.match.fatal = !!ev.fatal;
+      this.match.killAttack = a;
+      this._beginKO(ev.attacker, ev.defender, false);
+    }
     else if (ev.knockdown) this._beginKnockdown(ev.defender, ev.attacker, ev.tko, ev.takedown);
   }
 
@@ -737,6 +746,53 @@ export class Game {
   // -------------------------------------------------------------------------------------------
   // Knockout / decision / results
 
+  _boneBreak(ev) {
+    const fx = this.effects;
+    const p = this.player;
+    const names = { lArm: 'LEFT ARM', rArm: 'RIGHT ARM', lLeg: 'LEFT LEG', rLeg: 'RIGHT LEG' };
+    this.audio.play('boneCrack', { vol: 1.2, reverb: 0.3 });
+    this.audio.crowdReact('ooh', 1.1);
+    fx.hitstop(0.12);
+    fx.slowmo(0.35, 0.4);
+    this.rig.addTrauma(0.35);
+    if (fx.bloodOn) fx.bloodSpray(ev.point, 4, null);
+    this.excite = Math.min(1.3, this.excite + 0.35);
+    const who = ev.defender === p ? 'YOUR' : 'THEIR';
+    this.ui.notify(`${who} ${names[ev.broke]} IS BROKEN!`, ev.defender === p ? 'bad big' : 'good big', 2);
+  }
+
+  /** Tear a part off the dead fighter and send it flying. */
+  _dismember(loser, winner) {
+    const m = this.match;
+    const b = loser.broken;
+    // broken limbs come off first; head shots take the head
+    let parts = ['lArm', 'rArm', 'lLeg', 'rLeg', 'head', 'lArm', 'rArm'];
+    const brokenParts = Object.keys(b).filter((k) => b[k]);
+    if (brokenParts.length && Math.random() < 0.6) parts = brokenParts;
+    else if (m.killAttack && m.killAttack.height === 'high' && m.killAttack.impact >= 3 && Math.random() < 0.45) parts = ['head'];
+    const part = parts[(Math.random() * parts.length) | 0];
+    const obj = loser.model.detach(part, this.scene);
+    if (!obj) return null;
+    const dx = loser.pos.x - winner.pos.x;
+    const dz = loser.pos.z - winner.pos.z;
+    const l = Math.hypot(dx, dz) || 1;
+    const power = this.effects.gore > 1 ? 7 : 4.5;
+    this.effects.launchDebris(obj, (dx / l) * power + (Math.random() - 0.5) * 2, 3 + Math.random() * 3, (dz / l) * power + (Math.random() - 0.5) * 2);
+    this.audio.play('tear', { vol: 1.2 });
+    this.audio.play('boneCrack', { vol: 0.9 });
+    const fx = this.effects;
+    if (fx.bloodOn) {
+      const at = new THREE.Vector3();
+      obj.getWorldPosition(at);
+      const dir = new THREE.Vector3(dx / l, 0, dz / l);
+      fx.bloodSpray(at, 6, dir);
+      fx.bloodSpray(at, 6, dir.clone().negate());
+      fx.lensSplatter(this.effects.gore > 1 ? 5 : 2);
+    }
+    loser.bleed = 12;
+    return part;
+  }
+
   _beginKO(winner, loser, tko) {
     const m = this.match;
     if (m.over) return;
@@ -761,6 +817,18 @@ export class Game {
     this.after(0.4, () => this.audio.play('bellTriple', { vol: 1, reverb: 0.6 }));
     this.after(0.6, () => this.audio.play('bodyfall', { vol: 1 }));
     const lethal = FIGHT.deathMatch && m.mode !== 'training';
+    if (m.fatal) {
+      // FATAL BLOW: longer, heavier slow-motion beat
+      fx.slowmo(0.1, 2.4);
+      this.audio.play('impactHuge', { vol: 1.3, reverb: 1 });
+      this.ui.bigText('FATAL BLOW', 'ko', 1.2);
+    }
+    let severed = null;
+    if (lethal && this.goreOn) {
+      const chance = m.fatal ? 0.85 : this.effects.gore > 1 ? 0.65 : 0.3;
+      if (Math.random() < chance * (this.dismemberMult || 1)) severed = this._dismember(loser, winner);
+    }
+    m.severed = severed;
     if (lethal) {
       loser.model.setBlood(1);
       if (fx.gore > 1) {
@@ -782,8 +850,12 @@ export class Game {
     this.ui.hideCount();
     this.ui.hint('', false);
     const koText = lethal ? (loser === this.player ? 'YOU DIED' : 'FINISHED') : tko ? 'T.K.O.' : 'KNOCKOUT';
-    this.after(0.35, () => this.ui.bigText(koText, 'ko', 2.4));
-    this.after(2.8, () => this._celebrate(winner, loser));
+    this.after(m.fatal ? 1.3 : 0.35, () => this.ui.bigText(koText, 'ko', 2.4));
+    if (severed) {
+      const label = { head: 'DECAPITATED', lArm: 'ARM TORN OFF', rArm: 'ARM TORN OFF', lLeg: 'LEG TORN OFF', rLeg: 'LEG TORN OFF' }[severed];
+      this.after(0.5, () => this.ui.notify(label, 'bad big', 2.2));
+    }
+    this.after(m.fatal ? 3.6 : 2.8, () => this._celebrate(winner, loser));
   }
 
   _suddenDeath() {

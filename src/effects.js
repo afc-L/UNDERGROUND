@@ -163,6 +163,7 @@ export class Effects {
       this.splats.push(m);
     }
     this.splatCursor = 0;
+    this.debris = [];
 
     // Impact flash sprites
     this.flashes = [];
@@ -391,6 +392,61 @@ export class Effects {
     if (this.bloodOn) this.splat(x, z, size, 0.35);
   }
 
+  // ---- Severed parts --------------------------------------------------------------------------
+
+  /** Throw a severed body part (already in world space) with spin; it trails blood and lands. */
+  launchDebris(obj, vx, vy, vz) {
+    this.debris.push({
+      obj, vel: new THREE.Vector3(vx, vy, vz),
+      spin: new THREE.Vector3((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14),
+      landed: false, bleed: 2.5,
+    });
+  }
+
+  _updateDebris(dt) {
+    const _p = this._dp || (this._dp = new THREE.Vector3());
+    for (const d of this.debris) {
+      const o = d.obj;
+      d.vel.y -= 9.8 * dt;
+      o.position.addScaledVector(d.vel, dt);
+      o.rotation.x += d.spin.x * dt;
+      o.rotation.y += d.spin.y * dt;
+      o.rotation.z += d.spin.z * dt;
+      if (o.position.y < 0.09) {
+        o.position.y = 0.09;
+        if (!d.landed && this.bloodOn) this.splat(o.position.x, o.position.z, 0.35 + Math.random() * 0.2);
+        d.landed = true;
+        d.vel.y = Math.abs(d.vel.y) > 1 ? -d.vel.y * 0.3 : 0;
+        d.vel.x *= 0.55;
+        d.vel.z *= 0.55;
+        d.spin.multiplyScalar(0.5);
+      }
+      const r = Math.hypot(o.position.x, o.position.z);
+      if (r > 6.85) {
+        // bounce off the cage
+        const nx = o.position.x / r;
+        const nz = o.position.z / r;
+        o.position.x = nx * 6.85;
+        o.position.z = nz * 6.85;
+        const vn = d.vel.x * nx + d.vel.z * nz;
+        if (vn > 0) {
+          d.vel.x -= nx * vn * 1.5;
+          d.vel.z -= nz * vn * 1.5;
+        }
+      }
+      d.bleed -= dt;
+      if (this.bloodOn && d.bleed > 0 && Math.random() < 0.7) {
+        o.getWorldPosition(_p);
+        this.bloodDrops.emit(_p.x, _p.y, _p.z, (Math.random() - 0.5) * 0.6, 0.2, (Math.random() - 0.5) * 0.6, 0.55, 0.02, 0.03, 0.8, -9.8, 0.3);
+        if (d.landed && Math.random() < 0.05) this.splat(_p.x + (Math.random() - 0.5) * 0.3, _p.z + (Math.random() - 0.5) * 0.3, 0.1 + Math.random() * 0.12);
+      }
+    }
+  }
+
+  clearDebris() {
+    this.debris.length = 0; // the parts themselves are reattached by their fighter's model
+  }
+
   clearBlood() {
     for (const m of this.splats) m.visible = false;
     for (const b of this.lensBlood) {
@@ -431,6 +487,7 @@ export class Effects {
     this.glow.update(simDt);
     this.dust.update(simDt);
     this.bloodDrops.update(simDt);
+    this._updateDebris(simDt);
     for (const m of this.splats) {
       const u = m.userData;
       if (!m.visible || u.grow <= 0) continue;

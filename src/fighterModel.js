@@ -41,6 +41,8 @@ export class FighterModel {
     this.accent = new THREE.Color(accent);
     this.flash = 0;
     this.glow = 0;
+    this.detached = {};
+    this.stumpMat = new THREE.MeshStandardMaterial({ color: 0x6a0610, roughness: 0.3, flatShading: true });
     this._build();
   }
 
@@ -283,6 +285,7 @@ export class FighterModel {
 
   /** Apply a pose array to the rig. */
   apply(p, extraYaw = 0) {
+    const det = this.detached;
     this.offset.position.set(0, p[IDX.root], p[IDX.root + 1]);
     this.offset.rotation.y = p[IDX.root + 2] + extraYaw;
     this.body.rotation.set(p[IDX.tilt], 0, p[IDX.tilt + 1]);
@@ -292,19 +295,69 @@ export class FighterModel {
     i = IDX.spine;
     this.spine.rotation.set(p[i], p[i + 1], p[i + 2]);
     i = IDX.head;
-    this.head.rotation.set(p[i], p[i + 1], p[i + 2]);
+    if (!det.head) this.head.rotation.set(p[i], p[i + 1], p[i + 2]);
     i = IDX.lSh;
-    this.lSh.rotation.set(p[i], p[i + 1], p[i + 2]);
-    this.lEl.rotation.x = p[IDX.lEl];
+    if (!det.lArm) {
+      this.lSh.rotation.set(p[i], p[i + 1], p[i + 2]);
+      this.lEl.rotation.x = p[IDX.lEl];
+    }
     i = IDX.rSh;
-    this.rSh.rotation.set(p[i], p[i + 1], p[i + 2]);
-    this.rEl.rotation.x = p[IDX.rEl];
+    if (!det.rArm) {
+      this.rSh.rotation.set(p[i], p[i + 1], p[i + 2]);
+      this.rEl.rotation.x = p[IDX.rEl];
+    }
     i = IDX.lHip;
-    this.lHip.rotation.set(p[i], p[i + 1], p[i + 2]);
-    this.lKn.rotation.x = p[IDX.lKn];
+    if (!det.lLeg) {
+      this.lHip.rotation.set(p[i], p[i + 1], p[i + 2]);
+      this.lKn.rotation.x = p[IDX.lKn];
+    }
     i = IDX.rHip;
-    this.rHip.rotation.set(p[i], p[i + 1], p[i + 2]);
-    this.rKn.rotation.x = p[IDX.rKn];
+    if (!det.rLeg) {
+      this.rHip.rotation.set(p[i], p[i + 1], p[i + 2]);
+      this.rKn.rotation.x = p[IDX.rKn];
+    }
+  }
+
+  // --- Dismemberment ----------------------------------------------------------------------------
+
+  _part(name) {
+    return { head: this.head, lArm: this.lSh, rArm: this.rSh, lLeg: this.lHip, rLeg: this.rHip }[name];
+  }
+
+  /**
+   * Tear a body part off: it's moved into the scene (keeping its world transform) for the debris
+   * simulation, and a bloody stump is left at the joint. Returns the detached object.
+   */
+  detach(name, scene) {
+    if (this.detached[name]) return null;
+    const obj = this._part(name);
+    const parent = obj.parent;
+    this.detached[name] = { obj, parent, pos: obj.position.clone(), quat: obj.quaternion.clone(), scale: obj.scale.clone() };
+    const stump = new THREE.Mesh(sphere(name === 'head' ? 0.075 : 0.065, 7, 5), this.stumpMat);
+    stump.position.copy(obj.position);
+    stump.scale.set(1, name === 'head' ? 0.6 : 0.8, 1);
+    parent.add(stump);
+    this.detached[name].stump = stump;
+    scene.attach(obj);
+    // a raw end on the severed piece too
+    const end = new THREE.Mesh(sphere(0.06, 7, 5), this.stumpMat);
+    obj.add(end);
+    this.detached[name].end = end;
+    return obj;
+  }
+
+  /** Put every detached part back (new fight). */
+  reattachAll() {
+    for (const k of Object.keys(this.detached)) {
+      const d = this.detached[k];
+      d.parent.add(d.obj);
+      d.obj.position.copy(d.pos);
+      d.obj.quaternion.copy(d.quat);
+      d.obj.scale.copy(d.scale);
+      d.stump.removeFromParent();
+      d.end.removeFromParent();
+    }
+    this.detached = {};
   }
 
   /** Emissive hit flash (0..1) and special-move glove glow (0..1). */
@@ -327,6 +380,7 @@ export class FighterModel {
   }
 
   dispose() {
+    this.reattachAll();
     for (const m of this.materials) m.dispose();
     this.root.removeFromParent();
   }

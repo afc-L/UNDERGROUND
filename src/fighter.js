@@ -108,7 +108,9 @@ export class Fighter {
     this.pose.set(GUARD);
     this.model.glow = 0;
     this.model.setBlood(0);
-    this.stat = { thrown: 0, landed: 0, damage: 0, maxCombo: 0, knockdowns: 0, counters: 0, perfectBlocks: 0, perfectDodges: 0, blocked: 0, specials: 0 };
+    this.model.reattachAll();
+    this.broken = { lArm: false, rArm: false, lLeg: false, rLeg: false };
+    this.stat = { thrown: 0, landed: 0, damage: 0, maxCombo: 0, knockdowns: 0, counters: 0, perfectBlocks: 0, perfectDodges: 0, blocked: 0, specials: 0, bonesBroken: 0, fatal: 0 };
   }
 
   get exhausted() {
@@ -127,7 +129,17 @@ export class Fighter {
     return 1 - FIGHT.knockdownWear.power * this.wear;
   }
   get wearSpeed() {
-    return 1 - FIGHT.knockdownWear.speed * this.wear;
+    // knockdown wear, and limping on a broken leg (or two)
+    const legs = (this.broken.lLeg ? 1 : 0) + (this.broken.rLeg ? 1 : 0);
+    return (1 - FIGHT.knockdownWear.speed * this.wear) * (legs === 2 ? 0.5 : legs ? 0.7 : 1);
+  }
+
+  /** Damage multiplier for an attack thrown with a broken limb (kicks use the right leg). */
+  limbMult(atk) {
+    if (atk.limb === 'kick') return this.broken.rLeg ? 0.5 : 1;
+    if (atk.side < 0) return this.broken.lArm ? 0.5 : 1;
+    if (atk.side > 0) return this.broken.rArm ? 0.5 : 1;
+    return this.broken.lArm && this.broken.rArm ? 0.6 : 1;
   }
 
   get canAct() {
@@ -694,6 +706,26 @@ export class Fighter {
     }
 
     approachPose(this.pose, T, 1 - Math.exp(-rate * dt));
+    // broken limbs: arms hang, elbows and knees bend the wrong way
+    const b = this.broken;
+    const standing = !this.isDown;
+    if (b.lArm) {
+      if (standing) this.pose.set([0.12, 0, 0.12], IDX.lSh);
+      this.pose[IDX.lEl] = 0.75;
+    }
+    if (b.rArm) {
+      if (standing) this.pose.set([0.12, 0, -0.12], IDX.rSh);
+      this.pose[IDX.rEl] = 0.75;
+    }
+    if (b.lLeg) {
+      this.pose[IDX.lKn] = -0.5;
+      if (standing) this.pose[IDX.lHip + 2] += 0.12;
+    }
+    if (b.rLeg) {
+      this.pose[IDX.rKn] = -0.5;
+      if (standing) this.pose[IDX.rHip + 2] -= 0.12;
+    }
+    if (standing && (b.lLeg || b.rLeg)) this.pose[IDX.tilt + 1] = Math.sin(this.walkPhase) * 0.08 * (b.lLeg ? 1 : -1);
     this.model.capeLift = Math.hypot(this.moveVel.x, this.moveVel.z) * 0.12 + Math.hypot(this.vel.x, this.vel.z) * 0.08;
     if (this.state === 'thrown') {
       // flipped over the thrower: lifted along the arc and rotated head-first
