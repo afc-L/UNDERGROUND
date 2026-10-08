@@ -494,68 +494,27 @@ const aiDodge = await ev(() => {
 });
 check(aiDodge >= 2, `the AI dodges incoming specials (${aiDodge}/6)`);
 
-console.log('— Broken bones, fatal blows & dismemberment');
+console.log('— No extreme gore outside the Crucible');
 await faceOff(1.1);
 await recordEvents();
 await ev(() => {
-  window.__underground.game.combat.breakMult = 100; // guarantee a break for the test
+  const c = window.__underground.game.combat;
+  c.breakMult = 100;
+  c.fatalMult = 1000;
 });
-await press('KeyK');
-await step(40);
+const hpN = await ev(() => window.__underground.game.opp.health);
+for (let i = 0; i < 3; i++) {
+  await press('KeyK');
+  await step(45);
+}
 await ev(() => {
-  window.__underground.game.combat.breakMult = 0;
+  const c = window.__underground.game.combat;
+  c.breakMult = 0;
+  c.fatalMult = 0;
 });
-evs = await events();
-const broken = await ev(() => ({ ...window.__underground.game.opp.broken }));
-const brokeLimb = Object.keys(broken).find((k) => broken[k]);
-check(!!brokeLimb, `a big hit can break a bone (${brokeLimb})`);
-check(await ev(() => window.__underground.game.player.stat.bonesBroken) >= 1, 'broken bones are counted');
-const limbEffect = await ev((limb) => {
-  const o = window.__underground.game.opp;
-  const A = window.__underground.ATTACKS;
-  if (limb.endsWith('Leg')) return { speed: o.wearSpeed, kick: o.limbMult(A.roundhouse) };
-  return { jab: o.limbMult(limb === 'lArm' ? A.jab : A.cross) };
-}, brokeLimb);
-if (brokeLimb.endsWith('Leg')) check(limbEffect.speed < 0.75, `broken leg: limping (${Math.round(limbEffect.speed * 100)}% speed)`);
-else check(limbEffect.jab === 0.5, 'broken arm: punches with it do half damage');
-await faceOff(1.1);
-await ev((limb) => {
-  const g = window.__underground.game;
-  g.opp.broken[limb] = true;
-  g.player.broken = { lArm: false, rArm: false, lLeg: false, rLeg: false };
-}, brokeLimb);
-await step(10);
-await shot('06c-broken-limb');
-await ev(() => {
-  const g = window.__underground.game;
-  g.opp.broken = { lArm: false, rArm: false, lLeg: false, rLeg: false };
-  g.combat.fatalMult = 1000; // guarantee a fatal blow
-  g.dismemberMult = 10; // and a severed part
-});
-await recordEvents();
-const hpBeforeFatal = await ev(() => window.__underground.game.opp.health);
-await press('KeyK');
-await step(40);
-await ev(() => {
-  const g = window.__underground.game;
-  g.combat.fatalMult = 0;
-  g.dismemberMult = 1;
-});
-check((await st()).state === 'ko' && hpBeforeFatal > 100, `FATAL BLOW kills outright (from ${Math.round(hpBeforeFatal)} health)`);
-check(/FATAL BLOW/.test((await page.textContent('#bigtext')) || ''), 'FATAL BLOW shown');
-const sev = await ev(() => window.__underground.game.match.severed);
-check(!!sev && await ev(() => Object.keys(window.__underground.game.opp.model.detached).length === 1), `dismemberment: ${sev} torn off`);
-check(await ev(() => window.__underground.game.effects.debris.length === 1), 'the severed part flies off as debris');
-await step(30, 1 / 30);
-await shot('06d-dismember');
-await step(300, 1 / 30);
-check(await ev(() => window.__underground.game.effects.debris[0].landed), 'the severed part lands on the mat');
-check(await page.isVisible('#screen-results.active') && /Fatal blows/.test(await page.textContent('#r-stats')), 'results list fatal blows');
-await page.click('#r-actions button:has-text("REMATCH")');
-await step(5);
-check(await ev(() => Object.keys(window.__underground.game.opp.model.detached).length === 0 && window.__underground.game.effects.debris.length === 0), 'a new fight starts with everyone in one piece');
-await press('Space');
-await step(3);
+check(await ev(() => Object.values(window.__underground.game.opp.broken).every((b) => !b)), 'normal fights: no broken bones');
+check((await st()).state !== 'ko' && (await st()).o.hp > hpN - 60, 'normal fights: no fatal blows');
+for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
 
 console.log('— Health & ground attacks');
 check(await ev(() => window.__underground.game.player.stats.maxHealth) >= 180, `player health scaled up (${await ev(() => window.__underground.game.player.stats.maxHealth)})`);
@@ -857,6 +816,69 @@ await ev(() => {
 });
 await step(30);
 check(await ev(() => window.__underground.game.state) === 'fight', 'still fighting after 10 minutes (no clock)');
+console.log('— Crucible: broken bones, fatal blows & dismemberment');
+await faceOff(1.1);
+await recordEvents();
+await ev(() => {
+  window.__underground.game.combat.breakMult = 100; // guarantee a break for the test
+});
+await press('KeyK');
+await step(40);
+await ev(() => {
+  window.__underground.game.combat.breakMult = 0;
+});
+evs = await events();
+const broken = await ev(() => ({ ...window.__underground.game.opp.broken }));
+const brokeLimb = Object.keys(broken).find((k) => broken[k]);
+check(!!brokeLimb, `a big hit can break a bone (${brokeLimb})`);
+check(await ev(() => window.__underground.game.player.stat.bonesBroken) >= 1, 'broken bones are counted');
+const limbEffect = await ev((limb) => {
+  const o = window.__underground.game.opp;
+  const A = window.__underground.ATTACKS;
+  if (limb.endsWith('Leg')) return { speed: o.wearSpeed, kick: o.limbMult(A.roundhouse) };
+  return { jab: o.limbMult(limb === 'lArm' ? A.jab : A.cross) };
+}, brokeLimb);
+if (brokeLimb.endsWith('Leg')) check(limbEffect.speed < 0.75, `broken leg: limping (${Math.round(limbEffect.speed * 100)}% speed)`);
+else check(limbEffect.jab === 0.5, 'broken arm: punches with it do half damage');
+await faceOff(1.1);
+await ev((limb) => {
+  const g = window.__underground.game;
+  g.opp.broken[limb] = true;
+  g.player.broken = { lArm: false, rArm: false, lLeg: false, rLeg: false };
+}, brokeLimb);
+await step(10);
+await shot('06c-broken-limb');
+await ev(() => {
+  const g = window.__underground.game;
+  g.opp.broken = { lArm: false, rArm: false, lLeg: false, rLeg: false };
+  g.combat.fatalMult = 1000; // guarantee a fatal blow
+  g.dismemberMult = 10; // and a severed part
+});
+await recordEvents();
+const hpBeforeFatal = await ev(() => window.__underground.game.opp.health);
+await press('KeyK');
+await step(40);
+await ev(() => {
+  const g = window.__underground.game;
+  g.combat.fatalMult = 0;
+  g.dismemberMult = 1;
+});
+check((await st()).state === 'ko' && hpBeforeFatal > 100, `FATAL BLOW kills outright (from ${Math.round(hpBeforeFatal)} health)`);
+check(/FATAL BLOW/.test((await page.textContent('#bigtext')) || ''), 'FATAL BLOW shown');
+const sev = await ev(() => window.__underground.game.match.severed);
+check(!!sev && await ev(() => Object.keys(window.__underground.game.opp.model.detached).length === 1), `dismemberment: ${sev} torn off`);
+check(await ev(() => window.__underground.game.effects.debris.length === 1), 'the severed part flies off as debris');
+await step(30, 1 / 30);
+await shot('06d-dismember');
+await step(300, 1 / 30);
+check(await ev(() => window.__underground.game.effects.debris[0].landed), 'the severed part lands on the mat');
+check(await page.isVisible('#screen-results.active') && /Fatal blows/.test(await page.textContent('#r-stats')), 'results list fatal blows');
+await page.click('#r-actions button:has-text("REMATCH")');
+await step(5);
+check(await ev(() => Object.keys(window.__underground.game.opp.model.detached).length === 0 && window.__underground.game.effects.debris.length === 0), 'a new fight starts with everyone in one piece');
+await press('Space');
+await step(3);
+
 await faceOff(1.1);
 await ev(() => {
   window.__underground.game.opp.health = 5;

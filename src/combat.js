@@ -29,7 +29,8 @@ export class Combat {
     this.trainingInfinite = false;
     this.damageMult = 1; // e.g. sudden death, The Crucible
     this.knockbackMult = 1; // The Crucible: super strength sends people flying
-    this.goreOn = true; // broken bones (and dismemberment, handled by the game)
+    this.goreOn = true; // player setting for broken bones (and dismemberment, handled by the game)
+    this.extreme = false; // only The Crucible has broken bones, fatal blows and dismemberment
     this.breakMult = 1; // tuning / tests
     this.fatalMult = 1;
   }
@@ -234,7 +235,7 @@ export class Combat {
    * More likely the more hurt the victim already is. Never in training.
    */
   _rollFatal(atk, def) {
-    if (this.trainingInfinite) return false;
+    if (this.trainingInfinite || !this.extreme) return false;
     const base = atk.slam ? 0.05 : atk.kind === 'special' ? 0.04 : atk.ground ? 0.02 : atk.style || atk.kind === 'heavy' ? 0.012 : 0;
     if (!base) return false;
     const hurt = 1 - Math.max(0, def.health) / def.stats.maxHealth;
@@ -243,7 +244,7 @@ export class Combat {
 
   /** Big hits can snap a limb (once each): arms hang and hit half as hard, broken legs limp. */
   _rollBreak(att, atk, def, ev) {
-    if (!this.goreOn || this.trainingInfinite || !atk) return;
+    if (!this.extreme || !this.goreOn || this.trainingInfinite || !atk) return;
     let chance = atk.kind === 'special' ? 0.3 : atk.ground ? 0.08 : atk.impact >= 4 || atk.style ? 0.12 : atk.kind === 'heavy' ? 0.05 : 0;
     chance *= this.breakMult * (this.knockbackMult > 1 ? 1.5 : 1);
     if (!chance || Math.random() >= chance) return;

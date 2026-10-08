@@ -82,6 +82,7 @@ export class Game {
     if (this.player.crucible) this.buildPlayer();
     this.combat.damageMult = 1;
     this.combat.knockbackMult = 1;
+    this.combat.extreme = false; // no broken bones / fatal blows / dismemberment outside the Crucible
     this.effects.gore = 1;
     this.arena.setTheme('default');
   }
@@ -94,6 +95,7 @@ export class Game {
     this.scene.add(this.player.model.root);
     this.combat.damageMult = CRUCIBLE.damageMult;
     this.combat.knockbackMult = CRUCIBLE.knockbackMult;
+    this.combat.extreme = true;
     this.effects.gore = CRUCIBLE.goreScale;
     this.arena.setTheme('crucible');
   }
@@ -824,8 +826,8 @@ export class Game {
       this.ui.bigText('FATAL BLOW', 'ko', 1.2);
     }
     let severed = null;
-    if (lethal && this.goreOn) {
-      const chance = m.fatal ? 0.85 : this.effects.gore > 1 ? 0.65 : 0.3;
+    if (lethal && this.goreOn && m.mode === 'crucible') {
+      const chance = m.fatal ? 0.85 : 0.65;
       if (Math.random() < chance * (this.dismemberMult || 1)) severed = this._dismember(loser, winner);
     }
     m.severed = severed;

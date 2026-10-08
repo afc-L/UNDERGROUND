@@ -10,8 +10,8 @@ There's no backend, account, API key, database or external service. Three.js is 
 and every sound and the music are synthesized with the Web Audio API, so the game works fully
 offline. Every fight is a **death match**: it ends only when one fighter dies. Clean hits spray
 stylized blood that stays on the mat, and fighters get bloodier as their health drops. Turn
-**Blood** off in Settings for sparks and sweat only, and **Extreme Gore** off to remove
-dismemberment and broken bones. Everyone fights **bare-knuckle**: no gloves,
+**Blood** off in Settings for sparks and sweat only, and **Crucible Extreme Gore** off to
+remove dismemberment and broken bones from The Crucible. Everyone fights **bare-knuckle**: no gloves,
 and fists get bloodier as the fight goes on.
 
 ## Running it
@@ -88,17 +88,16 @@ through, so dodge it with `Shift` instead. A blocked takedown gets stuffed and l
   `K` for a **ground kick**, and chain them together. A downed fighter can't block or dodge, and
   getting kicked slows down their get-up. The AI does the same to you, so mash `J`/`K` to get
   up. A ground kick can be the killing blow.
-* **Broken bones.** Big hits (heavies, style moves, specials, ground kicks) can snap a limb,
+* **Broken bones (The Crucible only).** Big hits (heavies, style moves, specials, ground kicks) can snap a limb,
   once per limb, with an audible crack. A broken arm hangs limp, bends the wrong way at the
   elbow, and strikes thrown with it do half damage. A broken leg bends backwards at the knee,
   makes the fighter limp (30% slower, or 50% with both legs broken) and halves its kicks.
-  It's more likely in The Crucible.
-* **Fatal blows.** Any big hit has a small chance to kill outright, whatever the health bar
+* **Fatal blows (The Crucible only).** Any big hit has a small chance to kill outright, whatever the health bar
   says: about 1.2% for heavies and style moves, 2% for ground kicks, 4% for specials and 5% for
   a suplex, up to three times that against a badly hurt fighter. It plays a long slow-motion
-  **FATAL BLOW** beat. It cuts both ways, and never happens in training.
-* **Dismemberment.** Killing blows can tear off an arm, a leg or the head (30% normally, 65% in
-  The Crucible, 85% on a fatal blow). Already-broken limbs go first, and big head shots can
+  **FATAL BLOW** beat. It cuts both ways, and never happens in normal fights or training.
+* **Dismemberment (The Crucible only).** Killing blows can tear off an arm, a leg or the head (65%,
+  or 85% on a fatal blow). Already-broken limbs go first, and big head shots can
   decapitate. The part flies off with physics and a blood trail, bounces off the cage and
   leaves a bloody stump. Everyone is in one piece again for the next fight.
 * **Counters.** A perfect block staggers the attacker. Dodging through an attack (with
@@ -130,7 +129,8 @@ through, so dodge it with `Shift` instead. A blocked takedown gets stuffed and l
   Each Kronari has about 1000 health, hits for triple damage, and knocks people across the cage
   into the fence. There's no clock, the gore is turned way up (heavy sprays, splatter everywhere,
   blood hitting the screen, a huge pool on the kill), the arena burns furnace-red, and nobody flies.
-  It's an exhibition: no purse or career rewards, but your Crucible kills are counted.
+  Only here do bones break, big hits risk a **fatal blow**, and killing blows tear limbs off (see
+  the combat guide). It's an exhibition: no purse or career rewards, but your Crucible kills are counted.
 * **TOURNAMENT.** *The Pit Invitational* runs all six opponents back to back. One loss
   eliminates you. Winning pays a grand prize and the title.
 * **TRAINING.** Practice against a sparring partner that can't be killed. The move list is
