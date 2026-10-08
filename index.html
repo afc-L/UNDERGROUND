@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UNDERGROUND</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas" tabindex="0" aria-label="UNDERGROUND game view"></canvas>
+
+      <!-- Screen effects -->
+      <div id="fx-vignette"></div>
+      <div id="fx-hurt"></div>
+      <div id="fx-lines"></div>
+      <div id="fx-flash"></div>
+      <div id="fx-grain"></div>
+      <div id="dmg-numbers"></div>
+
+      <!-- HUD -->
+      <div id="hud" class="hidden">
+        <div class="hud-top">
+          <div class="hud-side left">
+            <div class="hud-name"><span id="hud-p-name">YOU</span><span class="kd-pips" id="hud-p-kd"></span></div>
+            <div class="bar health"><div class="ghost" id="hud-p-ghost"></div><div class="fill" id="hud-p-hp"></div></div>
+            <div class="bar stamina"><div class="fill" id="hud-p-st"></div></div>
+            <div class="special-wrap">
+              <div class="bar special"><div class="fill" id="hud-p-sp"></div></div>
+              <span id="hud-p-sp-label">SPECIAL</span>
+            </div>
+          </div>
+          <div class="hud-center">
+            <div id="hud-timer">2:00</div>
+            <div id="hud-opp-title">VS</div>
+          </div>
+          <div class="hud-side right">
+            <div class="hud-name"><span class="kd-pips" id="hud-o-kd"></span><span id="hud-o-name">OPPONENT</span></div>
+            <div class="bar health"><div class="ghost" id="hud-o-ghost"></div><div class="fill" id="hud-o-hp"></div></div>
+            <div class="bar stamina"><div class="fill" id="hud-o-st"></div></div>
+            <div class="special-wrap">
+              <span id="hud-o-sp-label">SPECIAL</span>
+              <div class="bar special"><div class="fill" id="hud-o-sp"></div></div>
+            </div>
+          </div>
+        </div>
+        <div id="combo"><span id="combo-n">0</span><span class="combo-label">HIT COMBO</span></div>
+        <div id="notify"></div>
+        <div id="lock-ind">◎ LOCKED</div>
+        <div id="training-panel" class="hidden">
+          <h4>TRAINING</h4>
+          <div class="tp-row"><b>1</b> Passive <b>2</b> Blocking <b>3</b> Sparring <span id="tp-mode">PASSIVE</span></div>
+          <div class="tp-row"><b>R</b> Fill special meter</div>
+          <div class="tp-moves">
+            <div><b>LMB ×4</b> Jab · Cross · Hook · Uppercut</div>
+            <div><b>RMB</b> Haymaker</div>
+            <div><b>LMB → RMB</b> Roundhouse kick</div>
+            <div><b>LMB ×3 → RMB</b> Spinning heel kick</div>
+            <div><b>Space</b> just before a hit = Perfect block</div>
+            <div><b>Shift</b> through an attack = Perfect dodge</div>
+            <div>Attack after either = <b>COUNTER</b> (×1.5)</div>
+            <div><b>E</b> Underground Breaker (full meter)</div>
+          </div>
+          <div class="tp-row dim">ESC for menu</div>
+        </div>
+        <div id="hint"></div>
+      </div>
+      <div id="bigtext"></div>
+      <div id="count"></div>
+
+      <!-- VS splash -->
+      <div id="vs" class="hidden">
+        <div class="vs-side vs-left"><div class="vs-label">THE CHALLENGER</div><div class="vs-name" id="vs-p"></div></div>
+        <div class="vs-mid">VS</div>
+        <div class="vs-side vs-right"><div class="vs-label" id="vs-o-title"></div><div class="vs-name" id="vs-o"></div><div class="vs-style" id="vs-o-style"></div></div>
+        <div class="vs-tourney" id="vs-tourney"></div>
+        <div class="vs-skip">CLICK / SPACE TO SKIP</div>
+      </div>
+
+      <!-- Main menu -->
+      <section id="screen-menu" class="screen">
+        <div class="menu-wrap">
+          <div class="title-block">
+            <div class="title-kicker">AN ILLEGAL-LOOKING TOURNAMENT · ENTIRELY FICTIONAL</div>
+            <h1 class="title glitch" data-text="UNDERGROUND">UNDERGROUND</h1>
+            <div class="title-sub">ENTER AS NOBODY. LEAVE AS A LEGEND.</div>
+          </div>
+          <nav class="menu-buttons">
+            <button data-action="fight" class="btn primary">FIGHT</button>
+            <button data-action="tournament" class="btn">TOURNAMENT</button>
+            <button data-action="training" class="btn">TRAINING</button>
+            <button data-action="upgrades" class="btn">UPGRADES</button>
+            <button data-action="fighter" class="btn">FIGHTER</button>
+            <button data-action="settings" class="btn">SETTINGS</button>
+          </nav>
+          <div class="menu-footer" id="menu-footer"></div>
+        </div>
+        <div class="menu-controls">
+          <b>WASD</b> move · <b>Mouse</b> camera · <b>LMB</b> light · <b>RMB</b> heavy · <b>Space</b> block · <b>Shift</b> dodge (hold to sprint) · <b>Q</b> lock-on · <b>E</b> special · <b>Esc</b> pause
+        </div>
+      </section>
+
+      <!-- Opponent select -->
+      <section id="screen-select" class="screen panel-screen">
+        <header class="screen-head">
+          <button class="btn back" data-action="back">◀ BACK</button>
+          <h2>CHOOSE YOUR OPPONENT</h2>
+          <div class="wallet" id="select-wallet"></div>
+        </header>
+        <div class="cards" id="select-cards"></div>
+      </section>
+
+      <!-- Tournament -->
+      <section id="screen-tournament" class="screen panel-screen">
+        <header class="screen-head">
+          <button class="btn back" data-action="back">◀ BACK</button>
+          <h2>THE PIT INVITATIONAL</h2>
+          <div class="wallet" id="tourney-wallet"></div>
+        </header>
+        <div class="tourney-body">
+          <p class="tourney-desc">Six fights. No second chances. Lose once and you're out. Survive the whole ladder to claim the title and the grand prize.</p>
+          <ol class="bracket" id="bracket"></ol>
+          <div class="tourney-prize" id="tourney-prize"></div>
+          <div class="tourney-actions"><button class="btn primary" id="tourney-go">START</button><button class="btn" id="tourney-forfeit">FORFEIT RUN</button></div>
+        </div>
+      </section>
+
+      <!-- Upgrades -->
+      <section id="screen-upgrades" class="screen panel-screen">
+        <header class="screen-head">
+          <button class="btn back" data-action="back">◀ BACK</button>
+          <h2>UPGRADES</h2>
+          <div class="wallet" id="up-wallet"></div>
+        </header>
+        <div class="upgrade-list" id="upgrade-list"></div>
+      </section>
+
+      <!-- Fighter -->
+      <section id="screen-fighter" class="screen panel-screen side-panel">
+        <header class="screen-head">
+          <button class="btn back" data-action="back">◀ BACK</button>
+          <h2>FIGHTER</h2>
+        </header>
+        <div class="fighter-body">
+          <label class="field">FIGHT NAME <input id="f-name" maxlength="16" spellcheck="false" /></label>
+          <div id="f-options"></div>
+          <div class="fighter-stats" id="f-stats"></div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="screen-settings" class="screen panel-screen">
+        <header class="screen-head">
+          <button class="btn back" data-action="back">◀ BACK</button>
+          <h2>SETTINGS</h2>
+        </header>
+        <div class="settings-body" id="settings-body"></div>
+      </section>
+
+      <!-- Pause -->
+      <section id="screen-pause" class="screen overlay">
+        <div class="pause-box">
+          <h2>PAUSED</h2>
+          <button class="btn primary" id="p-resume">RESUME</button>
+          <button class="btn" id="p-restart">RESTART FIGHT</button>
+          <button class="btn" id="p-quit">QUIT TO MENU</button>
+          <div class="pause-controls">
+            <div><b>W A S D</b> Move (camera-relative)</div>
+            <div><b>Mouse</b> Camera · <b>Q</b> toggle lock-on</div>
+            <div><b>Left click</b> Light attack — chain up to 4</div>
+            <div><b>Right click</b> Heavy attack / combo finisher</div>
+            <div><b>Space</b> Block (tap just before a hit to parry)</div>
+            <div><b>Shift</b> Dodge (hold to sprint)</div>
+            <div><b>E</b> Special attack (full meter)</div>
+            <div class="dim">Alt keys: J light · K heavy · L special</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section id="screen-results" class="screen overlay">
+        <div class="results-box">
+          <div class="results-title" id="r-title">VICTORY</div>
+          <div class="results-sub" id="r-sub"></div>
+          <div class="results-grid">
+            <div class="results-stats" id="r-stats"></div>
+            <div class="results-rewards" id="r-rewards"></div>
+          </div>
+          <div class="results-actions" id="r-actions"></div>
+        </div>
+      </section>
+
+      <div id="boot" class="boot">LOADING THE PIT…</div>
+      <div id="error-box" class="hidden"></div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

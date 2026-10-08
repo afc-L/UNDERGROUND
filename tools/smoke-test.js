@@ -1,0 +1,490 @@
+// End-to-end browser test (headless Chromium via Playwright).
+// Usage: `npm start` in one terminal, then `npm run check` (GAME_URL overrides the address).
+// Playwright is not a project dependency: install it globally or set NODE_PATH.
+// The harness freezes the render loop and steps the game manually so results don't depend on
+// how fast the (software-rendered) browser is.
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+
+const require = createRequire(import.meta.url);
+let chromium;
+try {
+  ({ chromium } = require('playwright'));
+} catch {
+  console.error('Playwright not found. Install it (npm i -g playwright) or set NODE_PATH to a folder containing it.');
+  process.exit(2);
+}
+
+const URL = process.env.GAME_URL || 'http://localhost:8080/';
+const shots = 'tools/screenshots';
+fs.mkdirSync(shots, { recursive: true });
+const errors = [];
+let failed = 0;
+let passed = 0;
+const check = (cond, msg) => {
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${msg}`);
+  if (cond) passed++;
+  else failed++;
+};
+
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || undefined,
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'],
+});
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
+});
+page.on('pageerror', (e) => errors.push(String(e.stack || e)));
+
+await page.goto(URL);
+await page.waitForFunction(() => !!window.__underground, null, { timeout: 30000 });
+await page.waitForTimeout(1200);
+
+const ev = (fn, arg) => page.evaluate(fn, arg);
+const step = (n, dt = 1 / 60) => ev(([n, dt]) => window.__underground.step(n, dt), [n, dt]);
+const shot = async (name) => {
+  await ev(() => window.__underground.render());
+  await page.screenshot({ path: `${shots}/${name}.png` });
+};
+const st = () => ev(() => {
+  const g = window.__underground.game;
+  const p = g.player;
+  const o = g.opp;
+  return {
+    state: g.state,
+    p: { x: p.pos.x, z: p.pos.z, hp: p.health, st: p.stamina, state: p.state, atk: p.attack && p.attack.id, sp: p.special, combo: p.combo, counter: p.counterTimer },
+    o: o && { x: o.pos.x, z: o.pos.z, hp: o.health, max: o.stats.maxHealth, state: o.state, kd: o.knockdowns },
+  };
+});
+// Record every combat event type (and attack ids) the game handles.
+const recordEvents = () => ev(() => {
+  const g = window.__underground.game;
+  window.__ev = [];
+  if (!g.__wrapped) {
+    g.__wrapped = true;
+    const h = g._handle.bind(g);
+    g._handle = (e) => {
+      window.__ev.push({ type: e.type, attack: e.attack && e.attack.id, who: (e.attacker || e.fighter || e.defender || {}).id, counter: e.counter || null, knockdown: !!e.knockdown, ko: !!e.ko });
+      h(e);
+    };
+  }
+});
+const events = () => ev(() => window.__ev);
+// Put the fighters face to face, opponent passive, both fresh.
+const faceOff = (dist = 1.1) => ev((dist) => {
+  const g = window.__underground.game;
+  const p = g.player;
+  const o = g.opp;
+  g.ai.mode = 'idle';
+  for (const f of [p, o]) {
+    f.setState('idle');
+    f.vel.set(0, 0, 0);
+    f.moveVel.set(0, 0, 0);
+    f.stamina = f.stats.maxStamina;
+    f.health = f.stats.maxHealth;
+    f.balance = 0;
+    f.combo = 0;
+    f.counterTimer = 0;
+    f.invuln = 0;
+    f.buffer = null;
+  }
+  p.pos.set(0, 0, 0);
+  p.facing = 0;
+  o.pos.set(0, 0, dist);
+  o.facing = Math.PI;
+  g.effects.clearTime();
+}, dist);
+const clickCanvas = (button = 'left') => page.mouse.click(640, 400, { button });
+
+// ------------------------------------------------------------------------------------------
+console.log('— Menu');
+await shot('01-menu');
+check(await page.isVisible('#screen-menu.active'), 'main menu visible');
+for (const b of ['fight', 'tournament', 'training', 'upgrades', 'fighter', 'settings']) {
+  check(await page.isVisible(`#screen-menu [data-action="${b}"]`), `menu button ${b.toUpperCase()}`);
+}
+await ev(() => {
+  window.__underground.frozen = true;
+});
+
+console.log('— Opponent select');
+await page.click('#screen-menu [data-action="fight"]');
+check(await page.isVisible('#screen-select.active'), 'opponent select opens');
+const cards = await page.$$('#select-cards .card');
+check(cards.length >= 5, `${cards.length} opponents listed`);
+const locked = await page.$$('#select-cards .card.locked');
+check(locked.length === cards.length - 1, 'only the first opponent is unlocked on a new career');
+const cardText = await page.textContent('#select-cards .card');
+check(/HEALTH/.test(cardText) && /POWER/.test(cardText) && /SPEED/.test(cardText) && /DEFENSE/.test(cardText) && /\$/.test(cardText), 'card shows stats and reward');
+await cards[0].hover();
+await step(20);
+check(await ev(() => !!window.__underground.game.opp), 'hovering a card previews the opponent in the cage');
+await shot('02-select');
+
+console.log('— Fight intro');
+await cards[0].click();
+await step(30);
+check(await ev(() => window.__underground.game.state) === 'intro', 'fight starts with an intro');
+check(await page.isVisible('#vs:not(.hidden)'), 'VS splash visible');
+await shot('03-intro');
+await page.keyboard.press('Space');
+await step(3);
+let s = await st();
+check(s.state === 'fight', 'Space skips the intro into the fight');
+check(await page.isVisible('#hud:not(.hidden)'), 'HUD visible');
+for (const id of ['hud-p-hp', 'hud-p-st', 'hud-p-sp', 'hud-o-hp', 'hud-o-st', 'hud-timer', 'combo']) check(!!(await page.$(`#${id}`)), `HUD has #${id}`);
+await recordEvents();
+
+console.log('— Movement');
+await faceOff(4);
+s = await st();
+await page.keyboard.down('KeyW');
+await step(60);
+await page.keyboard.up('KeyW');
+let s2 = await st();
+check(s2.p.z - s.p.z > 1.2, `W moves toward the opponent (${(s2.p.z - s.p.z).toFixed(2)}m)`);
+await faceOff(4);
+await page.keyboard.down('KeyD');
+await step(40);
+await page.keyboard.up('KeyD');
+s2 = await st();
+check(Math.abs(s2.p.x) > 0.8, `D strafes (${s2.p.x.toFixed(2)}m)`);
+await faceOff(4);
+await page.keyboard.down('KeyW');
+await step(5);
+await page.keyboard.down('ShiftLeft');
+await step(4);
+s = await st();
+check(s.p.state === 'dodge', 'Shift dodges');
+await step(40);
+s2 = await st();
+await page.keyboard.up('ShiftLeft');
+await page.keyboard.up('KeyW');
+check(s2.p.st < s.p.st + 1 && s2.p.st < 100, `holding Shift sprints and drains stamina (${s2.p.st.toFixed(1)})`);
+await shot('04-moving');
+
+console.log('— Attacks & combos');
+await faceOff(1.1);
+await recordEvents();
+s = await st();
+await clickCanvas('left');
+await step(3);
+s2 = await st();
+check(s2.p.state === 'attack' && s2.p.atk === 'jab', 'left click throws a jab');
+check(s2.p.st < s.p.st, 'attacking costs stamina');
+await step(25);
+s2 = await st();
+check(s2.o.hp < s.o.hp, `jab lands (${(s.o.hp - s2.o.hp).toFixed(1)} dmg)`);
+
+await faceOff(1.1);
+await recordEvents();
+for (let i = 0; i < 4; i++) {
+  await clickCanvas('left');
+  await step(11);
+}
+await step(30);
+let evs = await events();
+const chain = evs.filter((e) => e.type === 'attackStart' && e.who === 'player').map((e) => e.attack);
+check(chain.join(',') === 'jab,cross,hook,uppercut', `4 light clicks chain jab→cross→hook→uppercut (${chain.join(',')})`);
+const hits = evs.filter((e) => e.type === 'hit' && e.who === 'player').length;
+check(hits >= 3, `combo lands ${hits} hits`);
+check(await ev(() => window.__underground.game.player.stat.maxCombo) >= 3, 'combo counter reaches 3+');
+await shot('05-combo');
+
+await faceOff(1.1);
+await recordEvents();
+await clickCanvas('right');
+await step(4);
+check((await st()).p.atk === 'haymaker', 'right click throws a heavy haymaker');
+await step(60);
+await faceOff(1.3);
+await recordEvents();
+await clickCanvas('left');
+await step(10);
+await clickCanvas('right');
+await step(50);
+evs = await events();
+check(evs.some((e) => e.type === 'attackStart' && e.attack === 'roundhouse'), 'light → heavy chains into a roundhouse kick');
+check(evs.some((e) => e.type === 'hit' && e.attack === 'roundhouse'), 'roundhouse kick connects');
+
+console.log('— Defense');
+await faceOff(1.1);
+await recordEvents();
+await page.keyboard.down('Space');
+await step(30);
+check((await st()).p.state === 'block', 'Space blocks');
+s = await st();
+await ev(() => {
+  const g = window.__underground.game;
+  g.opp.startAttack(window.__underground.ATTACKS.cross, []);
+});
+await step(30);
+s2 = await st();
+await page.keyboard.up('Space');
+evs = await events();
+check(evs.some((e) => e.type === 'block'), 'block event fires');
+check(s.p.hp - s2.p.hp < 2, `blocking reduces damage to chip (${(s.p.hp - s2.p.hp).toFixed(2)})`);
+check(s2.p.st < s.p.st, 'blocking a hit costs stamina');
+
+await faceOff(1.1);
+await recordEvents();
+await ev(() => window.__underground.game.opp.startAttack(window.__underground.ATTACKS.haymaker, []));
+await step(10);
+await page.keyboard.down('Space');
+await step(20);
+await page.keyboard.up('Space');
+evs = await events();
+check(evs.some((e) => e.type === 'parry'), 'blocking right before impact is a PERFECT BLOCK');
+check((await st()).p.counter > 0 || evs.some((e) => e.type === 'parry'), 'perfect block opens a counter window');
+
+await faceOff(1.1);
+await recordEvents();
+await ev(() => window.__underground.game.opp.startAttack(window.__underground.ATTACKS.haymaker, []));
+await step(12);
+await page.keyboard.press('ShiftLeft');
+await step(6);
+evs = await events();
+check(evs.some((e) => e.type === 'perfectDodge'), 'dodging through an attack is a PERFECT DODGE');
+s = await st();
+check(s.p.counter > 0, 'perfect dodge opens a counter window');
+await step(14);
+await ev(() => {
+  const g = window.__underground.game;
+  g.player.pos.set(g.opp.pos.x, 0, g.opp.pos.z - 1.1);
+  g.player.facing = 0;
+});
+await clickCanvas('right');
+await step(40);
+evs = await events();
+check(evs.some((e) => e.type === 'hit' && e.who === 'player' && e.counter === 'COUNTER'), 'attacking in the window lands a COUNTER');
+
+console.log('— Special, knockdown & recovery');
+await faceOff(1.4);
+await recordEvents();
+await ev(() => {
+  const p = window.__underground.game.player;
+  p.special = 100;
+  p.specialCooldown = 0;
+});
+await page.keyboard.press('KeyE');
+await step(2);
+check((await st()).p.atk === 'special', 'E fires the special when the meter is full');
+await step(20);
+await shot('06-special');
+await step(30);
+evs = await events();
+check(evs.some((e) => e.type === 'hit' && e.attack === 'special'), 'special connects');
+s = await st();
+check(s.state === 'knockdown', 'special causes a knockdown');
+check(await ev(() => window.__underground.game.player.special) < 20, 'special consumes the meter');
+await step(40);
+await shot('07-knockdown');
+let sawCount = false;
+for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) {
+  await step(15);
+  if (((await page.textContent('#count')) || '').trim()) sawCount = true;
+}
+check(sawCount, 'referee count shows on screen');
+check((await st()).state === 'fight', 'opponent recovers and the fight resumes');
+check(await ev(() => window.__underground.game.opp.knockdowns) === 1, 'knockdown is recorded');
+await ev(() => {
+  const p = window.__underground.game.player;
+  p.special = 100;
+  p.specialCooldown = 0;
+});
+await faceOff(1.4);
+await page.keyboard.press('KeyE');
+await step(5);
+check((await st()).p.atk === 'special', 'special can be re-used once the meter refills');
+await step(80);
+for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
+
+console.log('— Knockout & results');
+await faceOff(1.1);
+await recordEvents();
+const cash0 = await ev(() => window.__underground.prog.data.cash);
+await ev(() => {
+  window.__underground.game.opp.health = 3;
+});
+await clickCanvas('right');
+await step(40);
+s = await st();
+check(s.state === 'ko', 'reducing health to zero is a KNOCKOUT');
+await step(25, 1 / 30);
+await shot('08-knockout');
+check(/KNOCKOUT/.test((await page.textContent('#bigtext')) || ''), 'KNOCKOUT text shown');
+await step(150, 1 / 30);
+await shot('09-victory');
+await step(120, 1 / 30);
+check(await page.isVisible('#screen-results.active'), 'results screen appears');
+check(/VICTORY/.test(await page.textContent('#r-title')), 'results say VICTORY');
+const statsText = await page.textContent('#r-stats');
+check(/Accuracy/.test(statsText) && /Max combo/.test(statsText) && /Knockdowns/.test(statsText), 'fight statistics shown');
+const prog = await ev(() => window.__underground.prog.data);
+check(prog.cash > cash0, `cash earned ($${cash0} → $${prog.cash})`);
+check(prog.rep > 0 && prog.record.w === 1 && prog.record.ko === 1, `reputation and record updated (rep ${prog.rep}, ${prog.record.w}W ${prog.record.ko}KO)`);
+check(await ev(() => window.__underground.prog.isUnlocked(window.__underground.OPPONENTS[1])), 'beating the Rookie unlocks the Brawler');
+await shot('10-results');
+
+console.log('— Upgrades');
+await page.click('#r-actions button:has-text("UPGRADES")');
+check(await page.isVisible('#screen-upgrades.active'), 'upgrades screen opens from results');
+const before = await ev(() => ({ cash: window.__underground.prog.data.cash, hp: window.__underground.game.player.stats.maxHealth }));
+await page.click('#upgrade-list .up-row:first-child button');
+const after = await ev(() => ({ cash: window.__underground.prog.data.cash, lvl: window.__underground.prog.data.upgrades.health, hp: window.__underground.game.player.stats.maxHealth }));
+check(after.lvl === 1 && after.cash < before.cash, `buying CONDITIONING costs cash ($${before.cash} → $${after.cash})`);
+check(after.hp > before.hp, `upgrade raises max health (${before.hp} → ${after.hp})`);
+await shot('11-upgrades');
+await page.click('#screen-upgrades [data-action="back"]');
+
+console.log('— Defeat');
+await page.click('#screen-menu [data-action="fight"]');
+await page.click('#select-cards .card:not(.locked)');
+await page.keyboard.press('Space');
+await step(3);
+await recordEvents();
+await faceOff(1.1);
+await ev(() => {
+  const g = window.__underground.game;
+  g.player.health = 2;
+  g.opp.startAttack(window.__underground.ATTACKS.haymaker, []);
+});
+await step(60);
+check((await st()).state === 'ko', 'player can be knocked out');
+await step(320, 1 / 30);
+check(await page.isVisible('#screen-results.active') && /DEFEAT/.test(await page.textContent('#r-title')), 'defeat screen shown');
+check(await ev(() => window.__underground.prog.data.record.l) === 1, 'loss recorded');
+await page.click('#r-actions button:has-text("MENU")');
+
+console.log('— Pause');
+await page.click('#screen-menu [data-action="fight"]');
+await page.click('#select-cards .card:not(.locked)');
+await page.keyboard.press('Space');
+await step(3);
+await page.keyboard.press('Escape');
+await step(2);
+check(await ev(() => window.__underground.game.state) === 'paused' && (await page.isVisible('#screen-pause.active')), 'Escape pauses');
+const tPause = await ev(() => window.__underground.game.match.timeLeft);
+await step(60);
+check(await ev(() => window.__underground.game.match.timeLeft) === tPause, 'clock frozen while paused');
+await page.click('#p-resume');
+await step(30);
+check(await ev(() => window.__underground.game.state) === 'fight', 'resume continues the fight');
+await page.keyboard.press('Escape');
+await step(2);
+await page.click('#p-quit');
+check(await page.isVisible('#screen-menu.active'), 'quit returns to the menu');
+
+console.log('— Training');
+await page.click('#screen-menu [data-action="training"]');
+await step(5);
+check(await ev(() => window.__underground.game.match.mode) === 'training', 'training starts');
+check(await page.isVisible('#training-panel:not(.hidden)'), 'training panel with move list');
+await page.keyboard.press('Digit3');
+await step(2);
+check(await ev(() => window.__underground.game.ai.mode) === 'fight', 'key 3 makes the partner spar');
+await step(240);
+await ev(() => {
+  window.__underground.game.opp.health = 2;
+});
+await faceOff(1.1);
+await clickCanvas('right');
+await step(60);
+check(await ev(() => window.__underground.game.state) !== 'ko', 'training partner cannot be knocked out');
+await shot('12-training');
+await page.keyboard.press('Escape');
+await step(2);
+await page.click('#p-quit');
+
+console.log('— Tournament');
+await page.click('#screen-menu [data-action="tournament"]');
+check(await page.isVisible('#screen-tournament.active'), 'tournament screen opens');
+check((await page.$$('#bracket li')).length >= 5, 'bracket lists every round');
+await page.click('#tourney-go');
+await step(5);
+check(await ev(() => !!window.__underground.game.match.tournament && window.__underground.game.match.profile.id === 'rookie'), 'tournament starts with round 1');
+await page.keyboard.press('Space');
+await step(3);
+await faceOff(1.1);
+await ev(() => {
+  window.__underground.game.opp.health = 2;
+});
+await clickCanvas('left');
+await step(30);
+await step(300, 1 / 30);
+check(await page.isVisible('#r-actions button:has-text("NEXT FIGHT")'), 'winning offers the NEXT FIGHT');
+await page.click('#r-actions button:has-text("NEXT FIGHT")');
+await step(5);
+check(await ev(() => window.__underground.game.match.profile.id) === 'brawler', 'next tournament fight is round 2');
+await page.keyboard.press('Escape');
+await step(2);
+await page.click('#p-quit');
+
+console.log('— Fighter & settings screens');
+await page.click('#screen-menu [data-action="fighter"]');
+check(await page.isVisible('#screen-fighter.active'), 'fighter screen opens');
+await page.click('#f-options .swatch[data-k="shorts"]:nth-child(2)');
+await step(10);
+check(await ev(() => window.__underground.prog.data.look.shorts) === '#1e40af', 'changing a color updates the fighter');
+await page.fill('#f-name', 'Iron Test');
+check(await ev(() => window.__underground.prog.data.name) === 'IRON TEST', 'fighter name saved');
+await shot('13-fighter');
+await page.click('#screen-fighter [data-action="back"]');
+await page.click('#screen-menu [data-action="settings"]');
+check(await page.isVisible('#screen-settings.active'), 'settings screen opens');
+await shot('14-settings');
+await page.click('#screen-settings [data-action="back"]');
+
+console.log('— AI soak (AI vs autopilot, every opponent)');
+const soak = await ev(() => {
+  const U = window.__underground;
+  const g = U.game;
+  const out = [];
+  for (const prof of U.OPPONENTS) {
+    g.startFight(prof, 'fight');
+    g.skipIntro();
+    g.autopilot = new U.AIController(U.OPPONENTS[2], 'normal');
+    const counts = {};
+    const h = g._handle.bind(g);
+    g._handle = (e) => {
+      counts[e.type] = (counts[e.type] || 0) + 1;
+      h(e);
+    };
+    let n = 0;
+    while (g.state !== 'results' && n < 60 * 200) {
+      g.update(1 / 60);
+      n++;
+    }
+    const states = new Set([...g.ai.visited, ...g.autopilot.visited]);
+    g._handle = h;
+    g.autopilot = null;
+    out.push({ id: prof.id, result: g.match.result ? (g.match.result.won ? 'autopilot' : prof.id) : 'none', how: g.match.result ? (g.match.result.ko ? 'KO' : 'decision') : '-', secs: Math.round(g.match.elapsed), hits: counts.hit || 0, blocks: counts.block || 0, kds: (g.player.knockdowns || 0) + (g.opp.knockdowns || 0), states: [...states].sort().join(' ') });
+    g.quitFight();
+  }
+  return out;
+});
+for (const r of soak) console.log(`      ${r.id.padEnd(11)} winner=${r.result.padEnd(11)} ${r.how.padEnd(8)} ${String(r.secs).padStart(3)}s hits=${r.hits} blocks=${r.blocks} knockdowns=${r.kds} [${r.states}]`);
+check(soak.every((r) => r.result !== 'none'), 'every AI fight reaches a conclusion');
+check(soak.every((r) => r.hits > 5), 'AI lands hits in every fight');
+const allStates = new Set(soak.flatMap((r) => r.states.split(' ')));
+for (const sName of ['IDLE', 'APPROACH', 'COMBO', 'DEFEND', 'RETREAT', 'COUNTER', 'RECOVER']) check(allStates.has(sName), `AI uses state ${sName}`);
+await ev(() => window.__underground.handlers.onResultsGo('menu'));
+
+console.log('— Performance (unfrozen render loop, software GL)');
+await ev(() => {
+  window.__underground.frozen = false;
+});
+await page.waitForTimeout(2500);
+console.log(`      fps (SwiftShader CPU rendering, not representative of a GPU): ${(await ev(() => window.__fps || 0)).toFixed(1)}`);
+const info = await ev(() => {
+  const r = window.__underground.game.renderer.info;
+  return { calls: r.render.calls, tris: r.render.triangles };
+});
+console.log(`      draw calls ${info.calls}, triangles ${info.tris}`);
+check(info.calls < 400, 'draw calls kept reasonable');
+
+check(errors.length === 0, `no console/page errors${errors.length ? `:\n${errors.join('\n')}` : ''}`);
+console.log(`\n${passed} passed, ${failed} failed`);
+await browser.close();
+process.exit(failed ? 1 : 0);

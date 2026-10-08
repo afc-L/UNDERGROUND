@@ -1,0 +1,15 @@
+{
+  "name": "underground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UNDERGROUND - a dark, cinematic arcade 3D fighting game for the browser, built with Three.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node build.js",
+    "check": "node tools/smoke-test.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
