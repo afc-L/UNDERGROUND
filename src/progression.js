@@ -1,5 +1,5 @@
 // Persistent career: cash, reputation, XP/levels, upgrades, wins and unlocks (localStorage only).
-import { OPPONENTS, PLAYER_DEFAULT_LOOK, DEFAULT_SETTINGS, TOURNAMENT } from './config.js';
+import { OPPONENTS, PLAYER_DEFAULT_LOOK, DEFAULT_SETTINGS, TOURNAMENT, FIGHT } from './config.js';
 import { upgradeCost } from './upgrades.js';
 
 const KEY = 'underground.save.v1';
@@ -109,7 +109,7 @@ export class Progression {
       lines.push(['Win purse', cash]);
       if (r.ko) {
         const b = Math.round(cash * 0.25);
-        lines.push([r.tko ? 'TKO bonus' : 'Knockout bonus', b]);
+        lines.push([FIGHT.deathMatch ? 'Kill bonus' : r.tko ? 'TKO bonus' : 'Knockout bonus', b]);
         cash += b;
         rep += Math.round(rep * 0.25);
         xp += Math.round(xp * 0.2);

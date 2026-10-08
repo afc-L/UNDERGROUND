@@ -27,6 +27,7 @@ export function impactPoint(attacker, defender, attack, out = new THREE.Vector3(
 export class Combat {
   constructor() {
     this.trainingInfinite = false;
+    this.damageMult = 1; // e.g. sudden death
   }
 
   /** Resolve both fighters' attacks against each other, then separate bodies. */
@@ -110,7 +111,7 @@ export class Combat {
     // Combo scaling keeps long strings strong but not instant-kill
     const combo = att.comboTimer > 0 ? att.combo + 1 : 1;
     if (combo > 4) mult *= Math.max(0.6, 1 - (combo - 4) * 0.06);
-    const damage = Math.max(1, atk.damage * mult * FIGHT.damageScale);
+    const damage = Math.max(1, atk.damage * mult * FIGHT.damageScale * this.damageMult);
 
     att.combo = combo;
     att.comboTimer = FIGHT.comboTimeout;
@@ -161,7 +162,7 @@ export class Combat {
       att.stat.knockdowns++;
       ev.knockdown = true;
       events.push(ev);
-      if (def.knockdowns >= FIGHT.maxKnockdowns && !this.trainingInfinite) ev.tko = true;
+      if (def.knockdowns >= FIGHT.maxKnockdowns && !this.trainingInfinite && !FIGHT.deathMatch) ev.tko = true;
       return;
     }
     if (def.balance >= FIGHTER.balanceMax) {

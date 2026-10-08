@@ -13,7 +13,9 @@ export const ARENA = {
 
 export const FIGHT = {
   duration: 120, // seconds on the fight clock
-  maxKnockdowns: 3, // third knockdown ends the fight (TKO)
+  deathMatch: true, // fights only end when someone dies (no T.K.O., no judges)
+  maxKnockdowns: 3, // third knockdown ends the fight (T.K.O.) when deathMatch is off
+  suddenDeathDamage: 1.75, // damage multiplier once the clock runs out in a death match
   comboTimeout: 1.4, // seconds between hits before the combo counter resets
   countInterval: 0.7, // seconds per referee count number
   damageScale: 0.8, // global damage multiplier (fight length tuning)
@@ -262,4 +264,5 @@ export const DEFAULT_SETTINGS = {
   shake: 1.0,
   quality: 'high', // 'high' | 'low'
   damageNumbers: true,
+  blood: true,
 };

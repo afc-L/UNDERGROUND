@@ -88,6 +88,7 @@ export class Fighter {
     this.moveVel.set(0, 0, 0);
     this.pose.set(GUARD);
     this.model.glow = 0;
+    this.model.setBlood(0);
     this.stat = { thrown: 0, landed: 0, damage: 0, maxCombo: 0, knockdowns: 0, counters: 0, perfectBlocks: 0, perfectDodges: 0, blocked: 0, specials: 0 };
   }
 

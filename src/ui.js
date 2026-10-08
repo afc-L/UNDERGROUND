@@ -204,7 +204,7 @@ export class UI {
       <span>CASH <b>$${d.cash.toLocaleString()}</b></span>
       <span>REP <b>${d.rep}</b></span>
       <span>LEVEL <b>${d.level}</b></span>
-      <span>RECORD <b>${d.record.w}-${d.record.l}</b> (${d.record.ko} KO)</span>
+      <span>RECORD <b>${d.record.w}-${d.record.l}</b> (${d.record.ko} ${FIGHT.deathMatch ? 'KILLS' : 'KO'})</span>
       ${d.champion ? '<span><b style="color:var(--pink)">★ PIT CHAMPION ★</b></span>' : ''}`;
   }
 
@@ -230,7 +230,7 @@ export class UI {
         ${bar('DEFENSE', (o.stats.defense - 0.5) / 0.8)}
         <div class="c-blurb">${o.blurb}</div>
         <div class="c-reward"><span class="cash">$${o.reward.cash}</span><span class="rep">+${o.reward.rep} REP</span><span>+${o.reward.xp} XP</span></div>
-        ${d.wins[o.id] ? `<div class="c-beaten">BEATEN ×${d.wins[o.id]}</div>` : ''}
+        ${d.wins[o.id] ? `<div class="c-beaten">DEFEATED ×${d.wins[o.id]}</div>` : ''}
         ${unlocked ? '' : `<div class="c-lock">LOCKED<small>${this.prog.lockReason(o)}</small></div>`}`;
       card.addEventListener('mouseenter', () => this.h.onPreview(o));
       card.addEventListener('focus', () => this.h.onPreview(o));
@@ -345,7 +345,7 @@ export class UI {
     $('f-stats').innerHTML = `
       <div><span>LEVEL</span><span>${d.level}</span></div><div><span>XP</span><span>${d.xp} / ${need}</span></div>
       <div class="xpbar"><i style="width:${Math.min(100, (d.xp / need) * 100)}%"></i></div>
-      <div><span>RECORD</span><span>${d.record.w}W - ${d.record.l}L</span></div><div><span>KNOCKOUTS</span><span>${d.record.ko}</span></div>
+      <div><span>RECORD</span><span>${d.record.w}W - ${d.record.l}L</span></div><div><span>${FIGHT.deathMatch ? 'KILLS' : 'KNOCKOUTS'}</span><span>${d.record.ko}</span></div>
       <div><span>CASH</span><span>$${d.cash}</span></div><div><span>REPUTATION</span><span>${d.rep}</span></div>
       <div><span>MAX HEALTH</span><span>${s.maxHealth}</span></div><div><span>MAX STAMINA</span><span>${s.maxStamina}</span></div>
       <div><span>POWER</span><span>${Math.round(s.power * 100)}%</span></div><div><span>SPEED</span><span>${Math.round(s.speed * 100)}%</span></div>
@@ -364,6 +364,7 @@ export class UI {
       ${slider('sensitivity', 'MOUSE SENSITIVITY', 0.3, 2.5, 0.05)}
       ${slider('shake', 'CAMERA SHAKE', 0, 1.5, 0.05)}
       <div class="set-row"><span>INVERT MOUSE Y</span><input type="checkbox" data-c="invertY" ${s.invertY ? 'checked' : ''} /></div>
+      <div class="set-row"><span>BLOOD</span><input type="checkbox" data-c="blood" ${s.blood !== false ? 'checked' : ''} /></div>
       <div class="set-row"><span>DAMAGE NUMBERS</span><input type="checkbox" data-c="damageNumbers" ${s.damageNumbers ? 'checked' : ''} /></div>
       <div class="set-row"><span>GRAPHICS QUALITY</span><select data-q="quality"><option value="high" ${s.quality === 'high' ? 'selected' : ''}>HIGH</option><option value="low" ${s.quality === 'low' ? 'selected' : ''}>LOW (FASTER)</option></select></div>
       <div class="set-row"><span>RESET CAREER</span><button class="btn danger" id="reset-btn">RESET PROGRESS</button></div>
@@ -401,7 +402,7 @@ export class UI {
     $('vs-o').textContent = profile.name;
     $('vs-o-title').textContent = profile.title;
     $('vs-o-style').textContent = `${profile.style.toUpperCase()} · ${DIFFICULTY[profile.difficulty].label}`;
-    $('vs-tourney').textContent = tourney ? `${tourney.name} — FIGHT ${tourney.round + 1} OF ${tourney.opponents.length}` : 'UNSANCTIONED BOUT';
+    $('vs-tourney').textContent = tourney ? `${tourney.name} — FIGHT ${tourney.round + 1} OF ${tourney.opponents.length}` : FIGHT.deathMatch ? 'DEATH MATCH · NO RULES · NO MERCY' : 'UNSANCTIONED BOUT';
     $('vs').classList.remove('hidden');
   }
 
@@ -476,9 +477,10 @@ export class UI {
     e.oSp.parentElement.classList.toggle('ready', o.specialReady);
     if (e.pName.textContent !== p.name) e.pName.textContent = p.name;
     if (e.oName.textContent !== o.title) e.oName.textContent = o.title;
-    const t = fmtTime(m.timeLeft);
+    const t = m.suddenDeath ? 'SUDDEN DEATH' : fmtTime(m.timeLeft);
     if (e.timer.textContent !== t) e.timer.textContent = t;
-    e.timer.classList.toggle('urgent', m.timeLeft < 15 && m.mode !== 'training');
+    e.timer.classList.toggle('urgent', (m.timeLeft < 15 || m.suddenDeath) && m.mode !== 'training');
+    e.timer.classList.toggle('sd', !!m.suddenDeath);
     const sub = m.mode === 'training' ? 'TRAINING' : m.tournament ? `FIGHT ${m.tournament.round + 1} / ${m.tournament.opponents.length}` : o.name;
     if (e.oppTitle.textContent !== sub) e.oppTitle.textContent = sub;
     if (this._kdP !== p.knockdowns) {
@@ -570,10 +572,13 @@ export class UI {
     this.clearOverlays();
     const won = result.won;
     const title = $('r-title');
-    title.textContent = won ? (tournament && tournament.done ? 'CHAMPION' : 'VICTORY') : 'DEFEAT';
+    const lethal = FIGHT.deathMatch && result.ko && !!summary;
+    title.textContent = won ? (tournament && tournament.done ? 'CHAMPION' : 'VICTORY') : lethal ? 'YOU DIED' : 'DEFEAT';
     title.className = `results-title ${won ? 'win' : 'lose'}`;
     const how = result.ko ? (result.tko ? 'T.K.O.' : 'KNOCKOUT') : 'JUDGES\' DECISION';
-    $('r-sub').textContent = `${won ? 'DEFEATED' : 'LOST TO'} ${profile.title} BY ${how} · ${fmtTime(stats.time)}${perfect ? ' · UNTOUCHED' : ''}`;
+    $('r-sub').textContent = lethal
+      ? `${won ? 'KILLED' : 'KILLED BY'} ${profile.title} · ${fmtTime(stats.time)}${perfect ? ' · UNTOUCHED' : ''}`
+      : `${won ? 'DEFEATED' : 'LOST TO'} ${profile.title} BY ${how} · ${fmtTime(stats.time)}${perfect ? ' · UNTOUCHED' : ''}`;
     const acc = stats.thrown ? Math.round((stats.landed / stats.thrown) * 100) : 0;
     const row = (a, b) => `<div><span>${a}</span><span>${b}</span></div>`;
     $('r-stats').innerHTML = `<h4>FIGHT STATS</h4>
@@ -582,7 +587,7 @@ export class UI {
       ${row('Damage dealt', Math.round(stats.damage))}
       ${row('Damage taken', Math.round(stats.oppDamage))}
       ${row('Max combo', stats.maxCombo)}
-      ${row('Knockdowns scored', stats.knockdowns)}
+      ${row('Knockdowns scored', Math.max(0, stats.knockdowns - (won && result.ko ? 1 : 0)))}
       ${row('Counters', stats.counters)}
       ${row('Perfect blocks', stats.perfectBlocks)}
       ${row('Perfect dodges', stats.perfectDodges)}

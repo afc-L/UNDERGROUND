@@ -11,6 +11,7 @@ import { Arena } from './arena.js';
 import { Effects } from './effects.js';
 import { CameraRig } from './camera.js';
 import { Referee } from './referee.js';
+import { FighterModel } from './fighterModel.js';
 import { playerStats, opponentStats } from './upgrades.js';
 import { TAUNT, GUARD } from './poses.js';
 
@@ -57,6 +58,10 @@ export class Game {
     this.rig.invertY = s.invertY;
     this.rig.shakeScale = s.shake;
     this.effects.showNumbers = s.damageNumbers;
+    this.effects.bloodOn = s.blood !== false;
+    FighterModel.bloodEnabled = s.blood !== false;
+    if (!this.effects.bloodOn) this.effects.clearBlood();
+    for (const f of [this.player, this.opp]) if (f) f.model.setBlood(f.inFight ? 1 - f.health / f.stats.maxHealth : 0);
     this.audio.setVolumes(s);
     const hi = s.quality === 'high';
     this.renderer.shadowMap.enabled = true;
@@ -160,6 +165,8 @@ export class Game {
     this.ai = new AIController(profile, mode === 'training' ? 'easy' : profile.difficulty);
     if (mode === 'training') this.ai.mode = 'idle';
     this.combat.trainingInfinite = mode === 'training';
+    this.combat.damageMult = 1;
+    this.effects.clearBlood();
     this.match = {
       mode, profile, tournament,
       timeLeft: FIGHT.duration, elapsed: 0,
@@ -376,7 +383,8 @@ export class Game {
       m.elapsed += dt;
       if (m.timeLeft <= 0) {
         m.timeLeft = 0;
-        this._decision();
+        if (FIGHT.deathMatch) this._suddenDeath();
+        else this._decision();
       }
     }
     if (m.mode === 'training') this._trainingUpdate(dt);
@@ -544,7 +552,8 @@ export class Game {
     const color = a.kind === 'special' ? ev.attacker.accent : ev.counter ? 0xffe14d : 0xffc870;
     au.play(a.sound, { vol: Math.min(1.3, 0.55 + lvl * 0.12), rate: 0.9 + Math.random() * 0.2, pan: pan(ev.point), reverb: 0.15 + lvl * 0.06 });
     if (lvl >= 4) au.play('impactHuge', { vol: 0.6 + (lvl - 4) * 0.25, reverb: 0.5 });
-    fx.impact(ev.point, lvl, color, dir);
+    fx.impact(ev.point, lvl, color, dir, { blood: true });
+    ev.defender.model.setBlood(1 - Math.max(0, ev.defender.health) / ev.defender.stats.maxHealth);
     fx.hitstop(HITSTOP[lvl]);
     fx.damageNumber(ev.point, ev.damage, `${ev.counter ? 'counter' : ''} ${lvl >= 4 ? 'big' : ''} ${ev.defender === p ? 'taken' : ''}`);
     this.rig.addTrauma(0.06 + lvl * 0.075 + (ev.counter ? 0.1 : 0));
@@ -687,7 +696,14 @@ export class Game {
     this.audio.crowdReact('roar', 1.4);
     this.after(0.4, () => this.audio.play('bellTriple', { vol: 1, reverb: 0.6 }));
     this.after(0.6, () => this.audio.play('bodyfall', { vol: 1 }));
+    const lethal = FIGHT.deathMatch && m.mode !== 'training';
+    if (lethal) {
+      loser.model.setBlood(1);
+      fx.bloodSpray(this._v.set(loser.pos.x, loser.model.height * 0.85, loser.pos.z).clone(), 6, this._v.set(loser.pos.x - winner.pos.x, 0, loser.pos.z - winner.pos.z).normalize().clone());
+    }
     this.after(0.7, () => {
+      // the body falls backwards: head ends up behind the feet
+      if (lethal) fx.bloodPool(loser.pos.x - Math.sin(loser.facing) * 1.3, loser.pos.z - Math.cos(loser.facing) * 1.3, 1.5);
       fx.dustBurst(loser.pos.x, loser.pos.z, 30, 1.2);
       this.arena.cameraFlashes();
       this.audio.crowdReact('roar', 1.4);
@@ -697,8 +713,22 @@ export class Game {
     this.referee.setMode('ko', { down: loser, up: winner });
     this.ui.hideCount();
     this.ui.hint('', false);
-    this.after(0.35, () => this.ui.bigText(tko ? 'T.K.O.' : 'KNOCKOUT', 'ko', 2.4));
+    const koText = lethal ? (loser === this.player ? 'YOU DIED' : 'FINISHED') : tko ? 'T.K.O.' : 'KNOCKOUT';
+    this.after(0.35, () => this.ui.bigText(koText, 'ko', 2.4));
     this.after(2.8, () => this._celebrate(winner, loser));
+  }
+
+  _suddenDeath() {
+    const m = this.match;
+    if (m.suddenDeath) return;
+    m.suddenDeath = true;
+    this.combat.damageMult = FIGHT.suddenDeathDamage;
+    this.audio.play('bellTriple', { vol: 1 });
+    this.audio.crowdReact('roar', 1.2);
+    this.excite = 1.1;
+    this.exciteBase = 0.6;
+    this.ui.bigText('SUDDEN DEATH', 'kd', 1.8);
+    this.ui.notify('ALL DAMAGE INCREASED', 'bad');
   }
 
   _decision() {

@@ -90,6 +90,7 @@ b { color: #fff; }
 @keyframes pulse { to { filter: brightness(1.4); } }
 .hud-center { text-align: center; min-width: 120px; }
 #hud-timer { font-family: var(--display); font-size: 46px; line-height: 1; text-shadow: 0 0 12px rgba(0, 0, 0, 0.9); letter-spacing: 2px; }
+#hud-timer.sd { font-size: 30px; }
 #hud-timer.urgent { color: var(--red); animation: pulse 0.5s infinite alternate; }
 #hud-opp-title { font-family: var(--display); font-size: 13px; letter-spacing: 3px; color: var(--dim); margin-top: 2px; }
 

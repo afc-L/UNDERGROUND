@@ -316,6 +316,48 @@ check((await st()).p.atk === 'special', 'special can be re-used once the meter r
 await step(80);
 for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
 
+console.log('— Blood & death-match rules');
+await faceOff(1.1);
+await recordEvents();
+for (let i = 0; i < 4; i++) {
+  await press('KeyJ');
+  await step(11);
+}
+await step(20);
+check(await ev(() => window.__underground.game.effects.splats.some((m) => m.visible)), 'clean hits splatter blood on the mat');
+check(await ev(() => window.__underground.game.opp.model.bloodPatches.some((m) => m.visible)), 'the opponent gets bloodied as health drops');
+await ev(() => {
+  window.__underground.game.opp.knockdowns = 2;
+  window.__underground.game.opp.special = 0;
+  const p = window.__underground.game.player;
+  p.special = 100;
+  p.specialCooldown = 0;
+});
+await faceOff(1.4);
+await ev(() => {
+  window.__underground.game.opp.knockdowns = 2;
+});
+await press('KeyE');
+await step(60);
+for (let i = 0; i < 40 && (await st()).state === 'knockdown'; i++) await step(15);
+check((await st()).state === 'fight' && (await st()).o.hp > 0, 'a third knockdown is not a T.K.O. (fight to the death)');
+await ev(() => {
+  window.__underground.game.match.timeLeft = 0.05;
+});
+await step(10);
+check(await ev(() => window.__underground.game.match.suddenDeath && window.__underground.game.combat.damageMult > 1 && window.__underground.game.state === 'fight'), 'time running out starts SUDDEN DEATH instead of a decision');
+await ev(() => {
+  const s = window.__underground.prog.data.settings;
+  s.blood = false;
+  window.__underground.handlers.onSettings(s);
+});
+check(await ev(() => !window.__underground.game.effects.splats.some((m) => m.visible) && !window.__underground.game.opp.model.bloodPatches.some((m) => m.visible)), 'BLOOD setting off removes all blood');
+await ev(() => {
+  const s = window.__underground.prog.data.settings;
+  s.blood = true;
+  window.__underground.handlers.onSettings(s);
+});
+
 console.log('— Knockout & results');
 await faceOff(1.1);
 await recordEvents();
@@ -326,10 +368,12 @@ await ev(() => {
 await press('KeyK');
 await step(40);
 s = await st();
-check(s.state === 'ko', 'reducing health to zero is a KNOCKOUT');
+check(s.state === 'ko', 'reducing health to zero kills the opponent');
 await step(25, 1 / 30);
 await shot('08-knockout');
-check(/KNOCKOUT/.test((await page.textContent('#bigtext')) || ''), 'KNOCKOUT text shown');
+check(/FINISHED/.test((await page.textContent('#bigtext')) || ''), 'killing blow shows FINISHED');
+check(await ev(() => window.__underground.game.effects.splats.filter((m) => m.visible).length) > 3, 'blood splatter on the mat');
+check(await ev(() => window.__underground.game.opp.model.bloodPatches.every((m) => m.visible)), 'the dead fighter is covered in blood');
 await step(150, 1 / 30);
 await shot('09-victory');
 await step(120, 1 / 30);
@@ -375,7 +419,7 @@ await ev(() => {
 await step(60);
 check((await st()).state === 'ko', 'player can be knocked out');
 await step(320, 1 / 30);
-check(await page.isVisible('#screen-results.active') && /DEFEAT/.test(await page.textContent('#r-title')), 'defeat screen shown');
+check(await page.isVisible('#screen-results.active') && /YOU DIED/.test(await page.textContent('#r-title')), 'YOU DIED screen shown');
 check(await ev(() => window.__underground.prog.data.record.l) === 1, 'loss recorded');
 await page.click('#r-actions button:has-text("MENU")');
 

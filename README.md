@@ -8,8 +8,9 @@ and fight your way to the Champion.
 There's no backend, account, API key, database or external service. Three.js is vendored in
 `vendor/`, every model is built from procedural geometry, every texture is drawn on a canvas,
 and every sound and the music are synthesized with the Web Audio API, so the game works fully
-offline. Combat is stylized and non-graphic: impacts show up as sparks, flashes, sweat spray,
-shockwaves and camera shake. There's no blood or injury.
+offline. Every fight is a **death match**: it ends only when one fighter dies. Clean hits spray
+stylized blood that stays on the mat, and fighters get bloodier as their health drops. Turn
+**Blood** off in Settings for sparks and sweat only.
 
 ## Running it
 
@@ -70,13 +71,13 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
   Below 25% you get slower and weaker. Blocking with an empty tank causes a **GUARD BREAK**.
 * **Balance and knockdowns.** Every clean hit chips at a hidden balance meter. Break it with a
   heavy hit, or land the special, for a **knockdown**. The referee counts and the downed
-  fighter recovers. If you're the one down, mash attack to get up faster. A third knockdown is
-  a **T.K.O.**, and zero health is a **KNOCKOUT**.
+  fighter recovers. If you're the one down, mash attack to get up faster. There's no T.K.O.:
+  the fight only ends when someone's health hits zero.
 * **Special meter.** It fills from landed hits, counters, perfect blocks and perfect dodges.
   Once it's full, `E` fires a slow-motion, armored, cinematic finisher that always knocks
   down. It then needs a long recharge.
-* **Fight clock.** Each fight lasts 2:00. If nobody gets knocked out, the judges give it to the
-  fighter with more health left.
+* **Fight clock.** Each fight has 2:00 on the clock. There are no judges: when time runs out
+  the fight goes to **SUDDEN DEATH** and every hit does 75% more damage.
 
 ## Game modes
 
@@ -85,7 +86,7 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
   earn enough reputation to unlock the next one.
 * **TOURNAMENT.** *The Pit Invitational* runs all six opponents back to back. One loss
   eliminates you. Winning pays a grand prize and the title.
-* **TRAINING.** Practice against a sparring partner that can't be knocked out. The move list is
+* **TRAINING.** Practice against a sparring partner that can't be killed. The move list is
   on screen. `1`/`2`/`3` switches the partner between passive, blocking and sparring. `R`
   refills your special meter.
 * **UPGRADES.** Spend cash on Conditioning (health), Cardio (stamina), Power, Footwork (speed),
@@ -93,7 +94,7 @@ All fighting is on the keyboard. Menus work with the mouse, or with the arrow ke
 * **FIGHTER.** Set your name, skin, hair, clothing, gloves, accessories and build, and see your
   record, level and stats.
 * **SETTINGS.** Volume (master/music/effects), mouse sensitivity, invert Y, camera shake
-  strength, damage numbers, graphics quality and a career reset.
+  strength, blood on/off, damage numbers, graphics quality and a career reset.
 
 Progress is saved to `localStorage` in your browser.
 
@@ -125,7 +126,8 @@ a bigger crowd reaction. Counters and long combos (5+) bump the level up. The bi
 a short cinematic: hit → slow motion → shake → impact flash and speed lines → reaction → normal
 speed. Knockdowns switch to a low-angle orbit camera with slow motion, a dust burst, a crowd
 roar and the referee's count. Knockouts add a slow cinematic orbit, a triple bell, phone camera
-flashes in the crowd, a **KNOCKOUT** slam, the winner's celebration with the referee signalling
+flashes in the crowd, a final burst of blood and a spreading pool, a **FINISHED** (or **YOU
+DIED**) slam, the winner's celebration with the referee signalling
 the winner, and a full stats and rewards screen.
 
 ## Project structure
@@ -190,7 +192,8 @@ NODE_PATH=$(npm root -g) npm run check      # needs Playwright installed globall
 `tools/smoke-test.js` drives the real game in headless Chromium with real keyboard and mouse
 input. It covers the menus, the opponent select screen, movement and sprint, the light chain,
 heavies and kicks, blocking, perfect blocks, perfect dodges, counters, the special, knockdown
-and recovery, knockout and results, rewards and unlocks, upgrades, defeat, pause, training,
+and recovery, blood and the death-match rules (no T.K.O., sudden death, the Blood setting),
+the killing blow and results, rewards and unlocks, upgrades, defeat, pause, training,
 the tournament, and the fighter and settings screens. It also runs an AI-vs-AI soak against
 every opponent and checks that every AI state gets used. Screenshots go to
 `tools/screenshots/`.

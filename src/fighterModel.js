@@ -28,6 +28,8 @@ const cyl = (rt, rb, h, seg = 7) => cached(`cyl${r2(rt)}_${r2(rb)}_${r2(h)}_${se
 const torus = (r, t) => cached(`tor${r2(r)}_${r2(t)}`, () => new THREE.TorusGeometry(r, t, 5, 12));
 
 export class FighterModel {
+  static bloodEnabled = true;
+
   constructor(look, accent = '#ffffff') {
     this.look = look;
     this.materials = [];
@@ -221,6 +223,40 @@ export class FighterModel {
     this.rKn = rLeg.kn;
 
     this.height = this.hipHeight + 0.12 + absLen + chestLen + 0.08 + hr * 2;
+
+    // Blood that appears as the fighter takes damage (each patch has a damage threshold)
+    const blood = new THREE.MeshStandardMaterial({ color: 0x7a0712, roughness: 0.3, metalness: 0.1, flatShading: true });
+    const front = 0.17 * b;
+    const patch = (parent, w, h, d, x, y, z, thr, ry = 0) => {
+      const m = new THREE.Mesh(box(w, h, d), blood);
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+      m.visible = false;
+      m.userData.thr = thr;
+      parent.add(m);
+      return m;
+    };
+    this.bloodPatches = [
+      patch(this.head, 0.024, 0.075, 0.012, 0, hr * 0.55, hr * 1.04, 0.12), // nose
+      patch(this.head, 0.055, 0.02, 0.012, 0.045, hr * 1.32, hr * 0.94, 0.28), // brow
+      patch(this.head, 0.016, 0.1, 0.012, 0.06, hr * 1.0, hr * 0.93, 0.4), // brow drip
+      patch(this.head, 0.045, 0.06, 0.012, -0.075, hr * 0.8, hr * 0.8, 0.52, -0.6), // cheek
+      patch(this.head, 0.06, 0.03, 0.012, 0, hr * 0.28, hr * 0.92, 0.6), // chin
+      patch(this.chest, 0.035, 0.16, 0.012, 0.03, chestLen * 0.62, front, 0.5), // chest
+      patch(this.chest, 0.03, 0.2, 0.012, -0.07, chestLen * 0.5, front, 0.72),
+      patch(this.chest, 0.06, 0.05, 0.012, 0.09, chestLen * 0.82, front, 0.86),
+    ];
+    this.gloveBase = new THREE.Color(L.gloves);
+    this._bloodAmt = 0;
+  }
+
+  /** 0 = clean, 1 = covered. Only shown when blood is enabled. */
+  setBlood(f) {
+    const amt = FighterModel.bloodEnabled ? f : 0;
+    if (Math.abs(amt - this._bloodAmt) < 0.01) return;
+    this._bloodAmt = amt;
+    for (const m of this.bloodPatches) m.visible = amt >= m.userData.thr;
+    this.gloveMat.color.copy(this.gloveBase).lerp(new THREE.Color(0x5a0710), amt * 0.45);
   }
 
   /** Apply a pose array to the rig. */

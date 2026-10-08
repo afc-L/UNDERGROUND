@@ -17,9 +17,38 @@ function radialTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,255,255,
   return t;
 }
 
+// Irregular splatter blob (white, tinted by the material) for floor blood decals.
+function splatTexture(seed) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  let r = seed * 9301 + 49297;
+  const rnd = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+  g.fillStyle = '#fff';
+  g.beginPath();
+  g.arc(64, 64, 26 + rnd() * 10, 0, Math.PI * 2);
+  g.fill();
+  for (let i = 0; i < 14; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = 20 + rnd() * 34;
+    g.beginPath();
+    g.arc(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, 3 + rnd() * 11, 0, Math.PI * 2);
+    g.fill();
+  }
+  for (let i = 0; i < 18; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = 40 + rnd() * 20;
+    g.beginPath();
+    g.arc(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, 1 + rnd() * 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
 class ParticlePool {
-  constructor(scene, count, { additive = true, size = 0.12, texture }) {
+  constructor(scene, count, { additive = true, size = 0.12, texture, fade = true }) {
     this.count = count;
+    this.fade = fade;
     this.pos = new Float32Array(count * 3);
     this.col = new Float32Array(count * 3);
     this.vel = new Float32Array(count * 3);
@@ -86,7 +115,7 @@ class ParticlePool {
         this.vel[k + 1] *= -0.3;
       }
       const f = this.life[i] / this.maxLife[i];
-      const a = f * f;
+      const a = this.fade ? f * f : 1;
       this.col[k] = this.base[k] * a;
       this.col[k + 1] = this.base[k + 1] * a;
       this.col[k + 2] = this.base[k + 2] * a;
@@ -104,6 +133,27 @@ export class Effects {
     this.sparks = new ParticlePool(scene, 420, { additive: true, size: 0.09, texture: soft });
     this.glow = new ParticlePool(scene, 160, { additive: true, size: 0.35, texture: soft });
     this.dust = new ParticlePool(scene, 220, { additive: false, size: 0.4, texture: radialTexture('rgba(150,140,130,1)', 'rgba(150,140,130,0)') });
+
+    // Blood: droplets plus floor splatter decals that stay for the whole fight
+    this.bloodOn = true;
+    this.bloodDrops = new ParticlePool(scene, 360, { additive: false, size: 0.075, fade: false, texture: radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)') });
+    this.bloodDrops.points.material.opacity = 0.95;
+    const splatGeo = new THREE.PlaneGeometry(1, 1);
+    splatGeo.rotateX(-Math.PI / 2);
+    this.splatMats = [1, 2, 3].map((k) => new THREE.MeshStandardMaterial({
+      map: splatTexture(k), color: 0x6e0710, transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    }));
+    this.splats = [];
+    for (let i = 0; i < 80; i++) {
+      const m = new THREE.Mesh(splatGeo, this.splatMats[i % 3]);
+      m.visible = false;
+      m.receiveShadow = true;
+      m.userData = { grow: 0, target: 1 };
+      scene.add(m);
+      this.splats.push(m);
+    }
+    this.splatCursor = 0;
 
     // Impact flash sprites
     this.flashes = [];
@@ -188,7 +238,7 @@ export class Effects {
   // ---- Spawners ------------------------------------------------------------------------------
 
   /** Hit sparks + flash scaled by impact level (1..6). */
-  impact(point, level, color = 0xffc870, dir = null) {
+  impact(point, level, color = 0xffc870, dir = null, opts = {}) {
     const n = 8 + level * 9;
     const c = new THREE.Color(color);
     for (let i = 0; i < n; i++) {
@@ -205,8 +255,9 @@ export class Effects {
       this.sparks.emit(point.x, point.y, point.z, (vx / l) * sp, (vy / l) * sp, (vz / l) * sp,
         c.r + w, c.g + w * 0.8, c.b + w * 0.5, 0.25 + Math.random() * 0.25 + level * 0.04, -7, 2.5);
     }
-    // sweat spray (stylized, non-graphic)
-    for (let i = 0; i < 3 + level * 2; i++) {
+    if (this.bloodOn && opts.blood) this.bloodSpray(point, level, dir);
+    // sweat spray
+    for (let i = 0; i < (this.bloodOn && opts.blood ? 2 : 3 + level * 2); i++) {
       const vx = (Math.random() - 0.5) * 2 + (dir ? dir.x * 2 : 0);
       const vz = (Math.random() - 0.5) * 2 + (dir ? dir.z * 2 : 0);
       this.sparks.emit(point.x, point.y + 0.05, point.z, vx, 1 + Math.random() * 2, vz, 0.55, 0.7, 0.85, 0.5 + Math.random() * 0.3, -9.8, 0.6);
@@ -270,6 +321,50 @@ export class Effects {
     this.glow.emit(point.x, point.y, point.z, 0, 0.2, 0, c.r * 0.8, c.g * 0.8, c.b * 0.8, 0.18, 0, 0);
   }
 
+  // ---- Blood ---------------------------------------------------------------------------------
+
+  /** Spray of droplets from a clean hit, plus splatter landing on the mat in the hit direction. */
+  bloodSpray(point, level, dir) {
+    const n = 6 + level * 9;
+    for (let i = 0; i < n; i++) {
+      const sp = 1.5 + Math.random() * (1.5 + level * 0.9);
+      const vx = (Math.random() - 0.5) * 1.6 + (dir ? dir.x * sp : 0);
+      const vz = (Math.random() - 0.5) * 1.6 + (dir ? dir.z * sp : 0);
+      const vy = 0.5 + Math.random() * 2.2;
+      const shade = 0.45 + Math.random() * 0.3;
+      this.bloodDrops.emit(point.x, point.y, point.z, vx, vy, vz, shade, 0.02, 0.03, 0.45 + Math.random() * 0.35, -9.8, 0.4);
+    }
+    const splats = Math.ceil(level / 2) + (Math.random() < 0.5 ? 1 : 0);
+    for (let i = 0; i < splats; i++) {
+      const d = 0.3 + Math.random() * (0.4 + level * 0.2);
+      const x = point.x + (dir ? dir.x * d : 0) + (Math.random() - 0.5) * 0.5;
+      const z = point.z + (dir ? dir.z * d : 0) + (Math.random() - 0.5) * 0.5;
+      this.splat(x, z, 0.12 + Math.random() * 0.12 + level * 0.05);
+    }
+  }
+
+  splat(x, z, size, grow = 0) {
+    if (Math.hypot(x, z) > 7.1) return; // stays on the mat
+    const m = this.splats[this.splatCursor];
+    this.splatCursor = (this.splatCursor + 1) % this.splats.length;
+    m.visible = true;
+    m.position.set(x, 0.012 + this.splatCursor * 0.0002, z);
+    m.rotation.y = Math.random() * Math.PI * 2;
+    m.userData.target = size;
+    m.userData.grow = grow;
+    m.scale.setScalar(grow > 0 ? size * 0.15 : size);
+    return m;
+  }
+
+  /** A slowly spreading pool (under a fighter who won't get up). */
+  bloodPool(x, z, size = 1.4) {
+    if (this.bloodOn) this.splat(x, z, size, 0.35);
+  }
+
+  clearBlood() {
+    for (const m of this.splats) m.visible = false;
+  }
+
   // ---- Screen effects ------------------------------------------------------------------------
 
   screenFlash(amount) {
@@ -301,6 +396,14 @@ export class Effects {
     this.sparks.update(simDt);
     this.glow.update(simDt);
     this.dust.update(simDt);
+    this.bloodDrops.update(simDt);
+    for (const m of this.splats) {
+      const u = m.userData;
+      if (!m.visible || u.grow <= 0) continue;
+      const cur = m.scale.x + (u.target - m.scale.x) * Math.min(1, simDt * u.grow);
+      m.scale.setScalar(cur);
+      if (Math.abs(cur - u.target) < 0.01) u.grow = 0;
+    }
     const cam = this.camera;
     for (const s of this.flashes) {
       if (!s.visible) continue;
